@@ -1,0 +1,25 @@
+{
+  "id": "/",
+  "name": "Vaelen Loom — Интерактивная RPG-новелла",
+  "short_name": "Vaelen Loom",
+  "description": "Бесконечный нарративный движок интерактивной новеллы: 3 мира, ветвящийся сюжет, реликвии и ИИ-Оракул.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0B0F17",
+  "theme_color": "#0B0F17",
+  "icons": [
+    {
+      "src": "/src/assets/images/preset_world_eldoria_1791455431121.webp",
+      "sizes": "192x192",
+      "type": "image/webp",
+      "purpose": "any"
+    },
+    {
+      "src": "/src/assets/images/preset_world_eldoria_1791455431121.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any"
+    }
+  ]
+}

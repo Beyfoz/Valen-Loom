@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Suppress Vite internal HMR WebSocket connection errors in sandbox iframe
+      window.addEventListener('error', function(event) {
+        var msg = event.message || '';
+        var file = event.filename || '';
+        if (
+          file.includes('@vite/client') ||
+          msg.includes('WebSocket') ||
+          msg.includes('createWebSocketModuleRunnerTransport')
+        ) {
+          event.stopImmediatePropagation();
+          event.preventDefault();
+          return true;
+        }
+      }, true);
+
+      window.addEventListener('unhandledrejection', function(event) {
+        var reason = event.reason;
+        var str = String((reason && (reason.stack || reason.message)) || reason || '');
+        if (
+          str.includes('@vite/client') ||
+          str.includes('createWebSocketModuleRunnerTransport') ||
+          str.includes('WebSocket')
+        ) {
+          event.stopImmediatePropagation();
+          event.preventDefault();
+        }
+      }, true);
+    </script>
+    <title>Vaelen Loom — Infinite Adventure Engine</title>
+    <meta name="description" content="An infinite choose-your-own-adventure narrative engine with persistent character art continuity, dynamic quest and inventory tracking, multi-model Oracle chat, and 1K/2K/4K real-time illustration generation." />
+    <meta property="og:title" content="Vaelen Loom — Infinite Adventure Engine" />
+    <meta property="og:description" content="An infinite choose-your-own-adventure narrative engine with persistent character art continuity, dynamic quest and inventory tracking, multi-model Oracle chat, and 1K/2K/4K real-time illustration generation." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#0B0F17" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bad+Script&family=Forum&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;1,7..72,400&display=swap&subset=cyrillic,latin" rel="stylesheet" />
+  </head>
+  <body class="bg-[#0D0B0E] text-[#EFE6CF] antialiased selection:bg-[#B8924A]/30 selection:text-[#EFE6CF]">
+    <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        if (window.location.hostname.includes('ais-dev') || window.location.hostname === 'localhost' || window.location.port === '3000') {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            for (var i = 0; i < regs.length; i++) {
+              regs[i].unregister();
+            }
+          });
+        } else {
+          window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js').catch(function(err) {
+              console.debug('ServiceWorker registration skipped:', err);
+            });
+          });
+        }
+      }
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
