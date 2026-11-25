@@ -8,7 +8,7 @@ export const astralStory: StoryPack = {
       id: 'astral_prologue_harbor',
       chapterTitle: 'Ночь первая: Гавань, где гаснет первая звезда',
       location: 'Нижние доки Гавани Шпиля',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'floating celestial harbor at twilight, wooden docks tethered to flying islands, a distant star winking out in a silver hawk constellation, young female captain clutching a comet shard talisman, ether mist, atmospheric',
       actionFocus: 'Лира у края причала: первая звезда в созвездии Ястреба гаснет прямо на глазах',
@@ -64,7 +64,7 @@ export const astralStory: StoryPack = {
       id: 'astral_prologue_crew',
       chapterTitle: 'Ночь первая: Экипаж «Алкиона»',
       location: 'Кают-компания «Алкиона»',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'cramped brass-trimmed ship cabin illuminated by glowing glass spheres, three crew members gathered around a star chart table, young navigator girl, weathered boatswain, cheeky engineer, tense camaraderie',
       actionFocus: 'Лира собирает экипаж перед отплытием: кому доверить правый борт?',
@@ -120,7 +120,7 @@ export const astralStory: StoryPack = {
       id: 'astral_aurora_drift',
       chapterTitle: 'Ночь первая: Зов в сиянии',
       location: 'Эфирный шлейф Серебряного Потока',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'skiff cutting through glowing green and violet celestial aurora, waves of starlight reflecting on brass hull, ghostly whale silhouette singing in the ether clouds, breathtaking, serene',
       actionFocus: '«Алкион» входит в полосу авроры: из глубины сияния доносится первый отзвук песни китов',
@@ -162,7 +162,7 @@ export const astralStory: StoryPack = {
       id: 'astral_whale_song',
       chapterTitle: 'Ночь вторая: Последняя из спевших',
       location: 'Сердце Кладбища Звёздных Китов',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'colossal dying star whale drifting among giant glowing ribcages in a nebula, a charred harpoon with a bronze plate lodged in its flank, faint golden ether rippling from its song, a small celestial skiff and a tense young captain at the rail, mournful, cinematic, painterly',
       actionFocus: 'Лира у борта: из рёбер умирающего кита торчит гарпун с именем её отца',
@@ -294,7 +294,7 @@ export const astralStory: StoryPack = {
       id: 'astral_lotus_arrival',
       chapterTitle: 'Ночь третья: Острова Забвения',
       location: 'Архипелаг Цветущих Лотосов',
-      localImage: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      localImage: '/images/preset_world_astral_1791455452771.webp',
       visualPrompt:
         'lush ethereal floating islands overgrown with giant violet and indigo lotus blossoms, sweet fragrant mist, glowing lanterns in willows, velvet pavilion at water edge, mysterious elegant matriarch awaiting on silk cushions',
       actionFocus: '«Алкион» входит в душистый фиолетовый туман Лотосовых Островов',
@@ -371,7 +371,7 @@ export const astralStory: StoryPack = {
       id: 'astral_lotus_feast',
       chapterTitle: 'Ночь третья: Пир усыплённых сердец',
       location: 'Шатёр Матушки Лотос',
-      localImage: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      localImage: '/images/preset_world_astral_1791455452771.webp',
       visualPrompt:
         'opulent interior of floating pavilion, brass censers pouring violet smoke, crystal goblet with glowing nectar, aged wise woman pouring elixir, captain holding glowing pendant, melancholy feast',
       actionFocus: 'Пир в шатре: кубок с росой лотоса и тяжёлые признания об Идрисе Солисе',
@@ -489,7 +489,7 @@ export const astralStory: StoryPack = {
       id: 'astral_lotus_dream',
       chapterTitle: 'Ночь третья: Морок об отце',
       location: 'Озеро Иллюзий / Палуба сна',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'surreal dreamscape of floating starry ocean, ghost of a weathered sea captain with a dragon harpoon standing in mist, young female captain reaching out, collapsing ethereal reflections, waking dawn',
       actionFocus: 'Видение Идриса Солиса в зыбком эфирном мареве',
@@ -563,7 +563,7 @@ export const astralStory: StoryPack = {
       id: 'astral_siren_strait',
       chapterTitle: 'Ночь четвёртая: Пролив Сирен',
       location: 'Пролив Поющих Рифов',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'dramatic night skiff navigating between jagged floating obsidian reefs, luminous siren-like ether apparitions hovering over water, companion gripping rail in agony, glowing sapphire eyes, stormy celestial skies',
       actionFocus: '«Алкион» среди поющих рифов: сирены зовут спутника Лиры его истинным именем',
@@ -648,7 +648,7 @@ export const astralStory: StoryPack = {
       id: 'astral_admiral_ambush',
       chapterTitle: 'Ночь четвёртая: Засада Серебряного Флота',
       location: 'Выход из Пролива Сирен / Борт дредноута «Вектор»',
-      localImage: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      localImage: '/images/preset_world_astral_1791455452771.webp',
       visualPrompt:
         'massive brass-armored celestial battleship looming out of the ether mists, spotlights targeting a small skiff, stern aristocratic admiral in silver-embroidered naval coat standing on bridge rail, tense standoff',
       actionFocus: 'Адмирал Кассиан Вор преграждает путь «Алкиону» на выходе из пролива',
@@ -749,7 +749,7 @@ export const astralStory: StoryPack = {
       id: 'astral_selestia_garden',
       chapterTitle: 'Ночь пятая: Сады Звёздных Имён',
       location: 'Парящие террасы Селестии',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'floating marble celestial observatory gardens, glowing celestial flora, giant brass astrolabes, a wise mechanical owl perched on starlight sundial, ethereal and sacred',
       actionFocus: 'Лира и Орион ступают на мраморные террасы: механическая сова-астролябия читает звёзды',
@@ -792,7 +792,7 @@ export const astralStory: StoryPack = {
       id: 'astral_observatory_truth',
       chapterTitle: 'Ночь пятая: Карта Памяти',
       location: 'Купол Великой Астролябии',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'inside a giant domed celestial observatory, holographic star chart revealing ether beast lineages, companion trembling as starlight projects a whale silhouette over his human body, shocking reveal',
       actionFocus: 'Проектор звёздного света освещает Ориона: на куполе разворачивается правда о его рождении',
@@ -822,7 +822,7 @@ export const astralStory: StoryPack = {
       id: 'astral_orion_confession',
       chapterTitle: 'Ночь пятая: Исповедь Сиэля',
       location: 'Балкон Звёздного Горизонта',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'melancholic balcony over endless purple cosmos, young man glowing with ethereal whale markings, holding a spool of golden celestial thread, crying tears of starlight, emotional catharsis',
       actionFocus: 'Орион открывает правду о своём долге и протягивает Нить Имён',
@@ -953,7 +953,7 @@ export const astralStory: StoryPack = {
       chapterTitle: 'Ночь шестая: Врата Эфира и Разлом Тишины',
       location: 'Врата Эфира — Разлом Тишины',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'titanic celestial leviathan dragon curled around cosmic gateway of ancient silver arches and blue aurora rift, starlight aura',
       actionFocus:
@@ -1077,7 +1077,7 @@ export const astralStory: StoryPack = {
       id: 'astral_leviathan_truth',
       chapterTitle: 'Ночь шестая: Врата Эфира и Разлом Тишины',
       location: 'Врата Эфира — Разум Звёздного Дракона',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'deep spiritual dreamscape inside celestial whale cosmic mind, constellation veins pulsing with starlight, majestic ancient wounded dragon opening huge gentle eyes',
       actionFocus: 'Левиафан говорит разумом Лиры: раскрыта правда о ране Вьярэля',
@@ -1114,7 +1114,7 @@ export const astralStory: StoryPack = {
       id: 'astral_gates_beyond',
       chapterTitle: 'Ночь шестая: Врата Эфира и Разлом Тишины',
       location: 'За Вратами Эфира — Створы Небесного Предела',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'ship emerging past titanic cosmic gateway into calm breathtaking starlight sea beneath soaring lighthouse peak, imperial dreadnought waiting quietly in shadow',
       actionFocus: '«Алкион» выходит за Врата: впереди подножие Маяка и флагман адмирала Вора',
@@ -1149,7 +1149,7 @@ export const astralStory: StoryPack = {
       id: 'astral_admiral_final',
       chapterTitle: 'Ночь шестая: Врата Эфира и Разлом Тишины',
       location: 'Флагман «Вектор» — Кают-компания Адмирала',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'iron dreadnought officers wardroom, austere silver admiral standing before star chart table, young female captain and companion, tense diplomatic atmosphere',
       actionFocus: 'Адмирал Кассиан Вор делает последнее предложение перед восхождением на Маяк',
@@ -1194,7 +1194,7 @@ export const astralStory: StoryPack = {
       chapterTitle: 'Ночь седьмая: Вершина Первой Звезды',
       location: 'Колыбель Вьярэля — Алтарь Маяка',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'apex of floating star lighthouse, crystalline dais under open cosmos where the dying Hawk star pulsates faint golden pulse',
       actionFocus:
@@ -1319,9 +1319,11 @@ export const astralStory: StoryPack = {
 
     astral_ending_return: {
       id: 'astral_ending_return',
+      isEnding: true,
+      endingType: 'victory',
       chapterTitle: 'Эпилог: Рассвет Звёздных Китов',
       location: 'Возрождённый Архипелаг',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'magnificent dawn with golden star whale leaping across skies of restored floating islands, ship sailing alongside joyful crew',
       actionFocus:
@@ -1331,21 +1333,16 @@ export const astralStory: StoryPack = {
         'Звезда Ястреба раскрывает золотые крылья над алтарём. Из глубин эфира, привлечённые светом, поднимаются тени звёздных китов — сотни сияющих исполинов плывут сквозь рассветные облака.',
         'Орион опускается на колени, по щекам его текут слёзы облегчения: «Мы искупили долг... Они вернулись». Острова больше не падают. «Алкион» ложится на обратный курс под ликующие крики экипажа.',
       ],
-      choices: [
-        {
-          id: 'c_finish_return',
-          text: 'Вернуться в Гавань Звёздного Шпиля легендой (Завершить)',
-          targetSceneId: 'astral_prologue_harbor',
-          approach: 'Investigative',
-        },
-      ],
+      choices: [],
     },
 
     astral_ending_fleet: {
       id: 'astral_ending_fleet',
+      isEnding: true,
+      endingType: 'sacrifice',
       chapterTitle: 'Эпилог: Железный Порядок Серебряного Флота',
       location: 'Селестия под флагами Империи',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'iron dreadnoughts patrolling skies around secured star spire, industrial cold order, admiral saluting captain',
       actionFocus:
@@ -1355,21 +1352,16 @@ export const astralStory: StoryPack = {
         'Но небо больше не поёт. Звёздные киты уходят в недосягаемые бездны, изгоняемые стуком имперских турбин. Острова закованы в чугунные якоря.',
         'Орион молча смотрит на серый рассвет. «Они выживут, Лира. Но небо уже никогда не будет прежним». В твоём кармане — пожизненный каперский патент и тяжесть необратимого выбора.',
       ],
-      choices: [
-        {
-          id: 'c_finish_fleet',
-          text: 'Сойти на причал новой военной гавани (Завершить)',
-          targetSceneId: 'astral_prologue_harbor',
-          approach: 'Diplomatic',
-        },
-      ],
+      choices: [],
     },
 
     astral_ending_free_sky: {
       id: 'astral_ending_free_sky',
+      isEnding: true,
+      endingType: 'destruction',
       chapterTitle: 'Эпилог: Ветер Свободного Неба',
       location: 'Бескрайний Дрейфующий Эфир',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'wild untamed skies with scattered fragments of islands floating freely, ship flying into infinite horizon with billowing sails',
       actionFocus:
@@ -1379,14 +1371,7 @@ export const astralStory: StoryPack = {
         'Ни Маяка, ни Флота, ни предначертанных путей. Только бескрайнее небо, полное опасностей, чудес и абсолютной свободы.',
         '«Алкион» ловит свежий порыв первозданного шторма. Лира сжимает штурвал — впереди целый неизведанный мир, где каждый остров теперь ищет собственную орбиту.',
       ],
-      choices: [
-        {
-          id: 'c_finish_free',
-          text: 'Взять курс на неизведанный горизонт (Завершить)',
-          targetSceneId: 'astral_prologue_harbor',
-          approach: 'Audacious',
-        },
-      ],
+      choices: [],
     },
   },
   patches: {
@@ -1501,7 +1486,7 @@ export const astralStory: StoryPack = {
       description: 'Маяк зажжён светом Осколка. Золотой столб света соединяет все парящие острова в единый архипелаг.',
       hint: 'Зажгите Маяк силой Осколка на вершине Небесного Предела.',
       endingType: 'victory',
-      cgUrl: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      cgUrl: '/images/preset_world_astral_1791455452771.webp',
     },
     {
       id: 'astral_ending_merge',
@@ -1509,7 +1494,7 @@ export const astralStory: StoryPack = {
       description: 'Лира и экипаж сливаются с эфирным потоком и звёздными китами в вечную легенду.',
       hint: 'Слейтесь с космическим потоком при высоком уровне стойкости духа (Sanity >= 40).',
       endingType: 'victory',
-      cgUrl: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      cgUrl: '/images/preset_world_astral_1791453508871.webp',
     },
     {
       id: 'astral_ending_constellations',
@@ -1517,7 +1502,7 @@ export const astralStory: StoryPack = {
       description: 'Взрыв кометного осколка сеет семена новых звёзд, рождая новые парящие континенты и созвездия.',
       hint: 'Пожертвуйте Осколком Кометы, бросив его в центр чаши Маяка.',
       endingType: 'sacrifice',
-      cgUrl: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      cgUrl: '/images/preset_world_astral_1791455452771.webp',
     },
     {
       id: 'astral_ending_return',
@@ -1525,7 +1510,7 @@ export const astralStory: StoryPack = {
       description: 'Осколок возвращён в Колыбель, Нить Имён запевает песнь китов, а Орион возвращается в истинный облик звёздного китёнка Сиэля.',
       hint: 'Узнайте правду об отце, выучите три Имени, простите Ориона, поймите Левиафана и заслужите наивысшее доверие спутника.',
       endingType: 'victory',
-      cgUrl: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      cgUrl: '/images/preset_world_astral_1791453508871.webp',
     },
     {
       id: 'astral_ending_fleet',
@@ -1533,7 +1518,7 @@ export const astralStory: StoryPack = {
       description: 'Осколок передан адмиралу Кассиану Вору. Четыре тысячи колонистов спасены ценой пленения звёздных китов.',
       hint: 'Заключите соглашение с адмиралом Вором о передаче Осколка.',
       endingType: 'sacrifice',
-      cgUrl: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      cgUrl: '/images/preset_world_astral_1791453508871.webp',
     },
     {
       id: 'astral_ending_free_sky',
@@ -1541,7 +1526,7 @@ export const astralStory: StoryPack = {
       description: 'Осколок разбит о Колыбель: свобода ветру, острова свободно дрейфуют в бескрайней небесной шири.',
       hint: 'Разбейте Осколок о Колыбель, отказавшись и от Маяка, и от власти Флота.',
       endingType: 'destruction',
-      cgUrl: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      cgUrl: '/images/preset_world_astral_1791453508871.webp',
     },
   ],
 };

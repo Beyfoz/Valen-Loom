@@ -39,6 +39,10 @@ export const ItemTileImage: React.FC<ItemTileImageProps> = ({
   const proceduralUrl = getItemIllustration(item);
   const [imgLoaded, setImgLoaded] = React.useState(false);
 
+  useEffect(() => {
+    setImgLoaded(false);
+  }, [artUrl]);
+
   const hasDistinctArt = isGenerated && artUrl && artUrl !== proceduralUrl;
 
   return (
@@ -55,6 +59,7 @@ export const ItemTileImage: React.FC<ItemTileImageProps> = ({
       {/* Crossfading Generated AI / Custom Artwork Layer (400ms smooth crossfade) */}
       {hasDistinctArt && (
         <img
+          key={artUrl}
           src={artUrl}
           alt={alt}
           onLoad={() => setImgLoaded(true)}
@@ -536,7 +541,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
               {/* Action Button Row */}
               <div className="pt-2">
-                {activeItem.usable ? (
+                {activeItem.usable && activeItem.useAction ? (
                   <button
                     type="button"
                     disabled={activeItem.charges !== undefined && activeItem.charges <= 0}
@@ -551,12 +556,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <span>
                       {activeItem.charges !== undefined && activeItem.charges <= 0
                         ? 'Истощён (0 зарядов)'
-                        : `${activeItem.useAction?.label || 'Применить предмет'} (U)`}
+                        : `${activeItem.useAction.label || 'Применить предмет'} (U)`}
                     </span>
                   </button>
                 ) : (
                   <div className="min-h-[44px] px-3 py-2 bg-[#121015]/60 border border-[#3A2E1D]/50 text-[#BAAC93] font-heading text-xs rounded-sm flex items-center justify-center text-center">
-                    Пассивный артефакт (эффект действует непрерывно)
+                    Сюжетная реликвия (применяется в диалогах и выборах)
                   </div>
                 )}
 

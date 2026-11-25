@@ -4,6 +4,9 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
+import sharp from 'sharp';
+import { ZipArchive } from 'archiver';
+import { SCENE_IMAGE_PROMPTS } from './src/data/sceneImagePrompts';
 
 dotenv.config();
 
@@ -12,22 +15,35 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json({ limit: '16mb' }));
+app.use('/scenes', express.static(path.resolve(__dirname, 'public/scenes')));
 
 const imageBase64Cache: Record<string, string> = {};
 const sceneImageCache = new Map<string, string>();
+const MAX_SCENE_IMAGE_CACHE = 50;
 
-// Disk cache directories for scene art generation and descriptions
-const SCENE_PROMPTS_CACHE_DIR = path.join(__dirname, '.cache', 'scene_prompts');
-const SCENE_IMAGES_CACHE_DIR = path.join(__dirname, '.cache', 'scene_images');
-
-try {
-  fs.mkdirSync(SCENE_PROMPTS_CACHE_DIR, { recursive: true });
-  fs.mkdirSync(SCENE_IMAGES_CACHE_DIR, { recursive: true });
-} catch (e) {
-  console.warn('Could not initialize .cache directory:', e);
+function setSceneImageCache(key: string, value: string): void {
+  if (sceneImageCache.has(key)) {
+    sceneImageCache.delete(key);
+  }
+  sceneImageCache.set(key, value);
+  while (sceneImageCache.size > MAX_SCENE_IMAGE_CACHE) {
+    const oldestKey = sceneImageCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      sceneImageCache.delete(oldestKey);
+    } else {
+      break;
+    }
+  }
 }
 
-const scenePromptMemoryCache = new Map<string, string>();
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
 function getBackdropForTurn({
   worldCoverImage = '',
@@ -70,9 +86,9 @@ function getBackdropForTurn({
       text.includes('механизм') ||
       text.includes('хранилищ')
     ) {
-      return '/src/assets/images/preset_world_eldoria_1791453485261.jpg'; // Interior flooded gothic vaults & sluice mechanisms
+      return '/images/preset_world_eldoria_1791453485261.webp'; // Interior flooded gothic vaults & sluice mechanisms
     }
-    return '/src/assets/images/preset_world_eldoria_1791455431121.jpg'; // Outer causeway & gateway
+    return '/images/preset_world_eldoria_1791455431121.webp'; // Outer causeway & gateway
   }
 
   // Astral Archipelago / Sky Corsair
@@ -90,9 +106,9 @@ function getBackdropForTurn({
       text.includes('левиафан') ||
       text.includes('руин')
     ) {
-      return '/src/assets/images/preset_world_astral_1791453508871.jpg'; // Leviathan abyss & floating spires
+      return '/images/preset_world_astral_1791453508871.webp'; // Leviathan abyss & floating spires
     }
-    return '/src/assets/images/preset_world_astral_1791455452771.jpg'; // Flying ship deck
+    return '/images/preset_world_astral_1791455452771.webp'; // Flying ship deck
   }
 
   // Neoverse / Clockwork Noir
@@ -110,33 +126,43 @@ function getBackdropForTurn({
       text.includes('небоскреб') ||
       text.includes('высот')
     ) {
-      return '/src/assets/images/preset_world_neoverse_1791453496951.jpg'; // Clockwork rooftops & night skyline
+      return '/images/preset_world_neoverse_1791453496951.webp'; // Clockwork rooftops & night skyline
     }
-    return '/src/assets/images/preset_world_neoverse_1791455441242.jpg'; // Rain-slicked station alley
+    return '/images/preset_world_neoverse_1791455441242.webp'; // Rain-slicked station alley
   }
 
   return (
     worldCoverImage ||
-    '/src/assets/images/preset_world_eldoria_1791455431121.jpg'
+    '/images/preset_world_eldoria_1791455431121.webp'
   );
 }
 
 function getImageBase64(imagePath?: string): string {
-  if (!imagePath) {
-    const defaultPath = path.resolve(__dirname, 'src/assets/images/preset_world_eldoria_1791455431121.jpg');
+  const publicDir = path.resolve(__dirname, 'public');
+  const readDefault = () => {
+    const defaultPath = path.resolve(publicDir, 'images/preset_world_eldoria_1791455431121.webp');
     if (fs.existsSync(defaultPath)) {
-      return `data:image/jpeg;base64,${fs.readFileSync(defaultPath).toString('base64')}`;
+      return `data:image/webp;base64,${fs.readFileSync(defaultPath).toString('base64')}`;
     }
     return '';
+  };
+
+  if (!imagePath) {
+    return readDefault();
   }
   if (imageBase64Cache[imagePath]) return imageBase64Cache[imagePath];
   try {
-    const clean = imagePath.replace(/^\//, '');
-    const full = path.resolve(__dirname, clean);
-    if (fs.existsSync(full)) {
+    const clean = imagePath.split('?')[0].replace(/^\/+/, '');
+    const full = path.resolve(publicDir, clean);
+    if (full.startsWith(publicDir + path.sep) && fs.existsSync(full) && fs.statSync(full).isFile()) {
       const buf = fs.readFileSync(full);
       const ext = path.extname(full).toLowerCase();
-      const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+      const mime =
+        ext === '.png'
+          ? 'image/png'
+          : ext === '.webp'
+          ? 'image/webp'
+          : 'image/jpeg';
       const b64 = `data:${mime};base64,${buf.toString('base64')}`;
       imageBase64Cache[imagePath] = b64;
       return b64;
@@ -144,11 +170,7 @@ function getImageBase64(imagePath?: string): string {
   } catch (err) {
     console.warn('Error reading base64 image from', imagePath, err);
   }
-  const defaultPath = path.resolve(__dirname, 'src/assets/images/preset_world_eldoria_1791455431121.jpg');
-  if (fs.existsSync(defaultPath)) {
-    return `data:image/jpeg;base64,${fs.readFileSync(defaultPath).toString('base64')}`;
-  }
-  return '';
+  return readDefault();
 }
 
 function getGenAI() {
@@ -162,50 +184,66 @@ function getGenAI() {
   });
 }
 
+function resolveTextModels(preferredModel?: string): string[] {
+  if (preferredModel === 'gemini-3.1-flash-lite' || preferredModel === 'gemini-2.5-flash-lite') {
+    return ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+  }
+  if (preferredModel === 'gemini-3.1-pro-preview') {
+    return ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+  }
+  return ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+}
+
+let textQuotaCooldownUntil = 0;
+let imageQuotaCooldownUntil = 0;
+let geminiCallCount = 0;
+
 async function generateWithFallback(
   modelsToTry: string[],
   buildParams: (model: string) => any,
-  meta?: { sceneId?: string; stage?: 'describe' | 'generate' }
+  isImageRequest = false
 ) {
+  const now = Date.now();
+  const cooldownUntil = isImageRequest ? imageQuotaCooldownUntil : textQuotaCooldownUntil;
+  if (now < cooldownUntil) {
+    const err: any = new Error('Quota cooldown active');
+    err.status = 429;
+    err.reason = 'quota';
+    throw err;
+  }
+
   const ai = getGenAI();
   let lastError: any = null;
   for (const modelName of modelsToTry) {
-    let attempt = 0;
-    while (attempt < 2) {
-      attempt++;
-      const startModelAttempt = Date.now();
-      try {
-        const params = buildParams(modelName);
-        const response = await ai.models.generateContent(params);
-        if (meta?.sceneId && meta?.stage) {
-          console.log(`[SceneArt] ${meta.sceneId} | ${meta.stage} | model: ${modelName} | успех | ${Date.now() - startModelAttempt}ms`);
+    try {
+      geminiCallCount++;
+      console.log(
+        `[Gemini Call #${geminiCallCount}] Model: ${modelName} | Type: ${isImageRequest ? 'IMAGE' : 'TEXT'}`
+      );
+      const params = buildParams(modelName);
+      const response = await ai.models.generateContent(params);
+      return { response, modelUsed: modelName };
+    } catch (err: any) {
+      lastError = err;
+      const isQuotaError =
+        err?.status === 429 ||
+        err?.code === 429 ||
+        String(err?.message || '').includes('429') ||
+        String(err?.message || '').includes('RESOURCE_EXHAUSTED') ||
+        String(err?.message || '').toLowerCase().includes('quota');
+
+      if (isQuotaError) {
+        if (isImageRequest) {
+          imageQuotaCooldownUntil = Date.now() + 60000;
+        } else {
+          textQuotaCooldownUntil = Date.now() + 60000;
         }
-        return { response, modelUsed: modelName };
-      } catch (err: any) {
-        lastError = err;
-        const errCode = err?.status || err?.code || 500;
-        const errStr = String(err?.message || err);
-        const errSnippet = errStr.replace(/\r?\n|\r/g, ' ').slice(0, 150);
-
-        if (meta?.sceneId && meta?.stage) {
-          console.log(`[SceneArt] ${meta.sceneId} | ${meta.stage} | model: ${modelName} | HTTP ${errCode}: ${errSnippet} | ${Date.now() - startModelAttempt}ms`);
-        }
-
-        const isTemporary =
-          errCode === 503 ||
-          errCode === 429 ||
-          errStr.includes('503') ||
-          errStr.includes('429') ||
-          errStr.includes('RESOURCE_EXHAUSTED') ||
-          errStr.includes('UNAVAILABLE');
-
-        if (isTemporary && attempt === 1) {
-          await new Promise((resolve) => setTimeout(resolve, 800));
-          continue;
-        }
-
+        console.warn(`Quota limit hit for ${modelName}. Setting 60s cooldown.`);
         break;
       }
+      console.warn(
+        `Model ${modelName} failed (${err?.status || err?.message}), trying next fallback...`
+      );
     }
   }
   throw lastError;
@@ -225,7 +263,7 @@ app.post('/api/story/turn', async (req, res) => {
       currentQuest,
       inventory,
       characters,
-      preferredModel = 'gemini-3.5-flash',
+      preferredModel = 'gemini-2.5-flash',
       language = 'ru',
       worldCoverImage = '',
     } = req.body;
@@ -437,12 +475,7 @@ Generate the next turn of the adventure in structured JSON.`;
       ],
     };
 
-    const modelOrder =
-      preferredModel === 'gemini-3.1-flash-lite'
-        ? ['gemini-3.1-flash-lite', 'gemini-3.8-flash']
-        : preferredModel === 'gemini-3.1-pro-preview'
-        ? ['gemini-3.1-pro-preview', 'gemini-3.8-flash', 'gemini-3.1-flash-lite']
-        : ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+    const modelOrder = resolveTextModels(preferredModel);
 
     const { response, modelUsed } = await generateWithFallback(modelOrder, (model) => ({
       model,
@@ -451,9 +484,6 @@ Generate the next turn of the adventure in structured JSON.`;
         systemInstruction,
         responseMimeType: 'application/json',
         responseSchema,
-        ...(model === 'gemini-3.1-flash-lite'
-          ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } }
-          : {}),
       },
     }));
 
@@ -475,7 +505,7 @@ Generate the next turn of the adventure in structured JSON.`;
       turnNumber: nextTurnNum,
       language,
     });
-    sceneImageCache.set(sceneId, svgIllustration);
+    setSceneImageCache(sceneId, svgIllustration);
 
     res.json({
       ...parsed,
@@ -502,7 +532,7 @@ app.post('/api/story/enrich', async (req, res) => {
       sceneText,
       inventory = [],
       stats = {},
-      modelTier = 'gemini-3.5-flash',
+      modelTier = 'gemini-2.5-flash',
       protagonist = 'Герой',
       companion = '',
       recentSensoryTexts = [],
@@ -563,12 +593,7 @@ ${previousSensoryWarnings ? `НЕ ПОВТОРЯТЬ ЭТИ ОБРАЗЫ И ФР
       required: ['sensoryDetail', 'companionWhisper'],
     };
 
-    const modelOrder =
-      modelTier === 'gemini-3.1-pro-preview'
-        ? ['gemini-3.1-pro-preview', 'gemini-3.8-flash', 'gemini-3.1-flash-lite']
-        : modelTier === 'gemini-3.1-flash-lite'
-        ? ['gemini-3.1-flash-lite', 'gemini-3.8-flash']
-        : ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+    const modelOrder = resolveTextModels(modelTier);
 
     const { response, modelUsed } = await generateWithFallback(modelOrder, (model) => ({
       model,
@@ -577,9 +602,6 @@ ${previousSensoryWarnings ? `НЕ ПОВТОРЯТЬ ЭТИ ОБРАЗЫ И ФР
         systemInstruction,
         responseMimeType: 'application/json',
         responseSchema,
-        ...(model === 'gemini-3.1-flash-lite'
-          ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } }
-          : {}),
       },
     }));
 
@@ -592,8 +614,11 @@ ${previousSensoryWarnings ? `НЕ ПОВТОРЯТЬ ЭТИ ОБРАЗЫ И ФР
     });
   } catch (error: any) {
     console.error('Story enrich error:', error);
-    res.status(500).json({
-      error: error?.message || 'Failed to enrich scene.',
+    res.status(200).json({
+      sensoryDetail: 'В воздухе витает напряженная тишина, заставляющая прислушаться к каждому шороху.',
+      companionWhisper: '',
+      modelUsed: 'fallback',
+      latencyMs: 0,
     });
   }
 });
@@ -831,11 +856,14 @@ function createCinematicSceneIllustration({
     .replace(/>/g, '&gt;')
     .slice(0, 40);
 
-  const characterNames = (presentCharacters || [])
-    .map((c) => c.name)
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(' · ');
+  const characterNames = escapeXml(
+    (presentCharacters || [])
+      .map((c) => c.name)
+      .filter(Boolean)
+      .slice(0, 3)
+      .join(' · ')
+  );
+  const safeImageSize = escapeXml(String(imageSize || '1K'));
 
   const actionPrefix = isRu ? 'ДЕЙСТВИЕ ИГРОКА:' : 'PLAYER ACTION:';
   const consequencePrefix = isRu ? 'ПОСЛЕДСТВИЕ:' : 'CONSEQUENCE:';
@@ -954,7 +982,7 @@ function createCinematicSceneIllustration({
           ${presencePrefix} ${characterNames || 'Герой'}
         </text>
         <text y="30" fill="#94A3B8" font-size="10" font-family="'JetBrains Mono', monospace">
-          ${imageSize} · ART CONTINUITY
+          ${safeImageSize} · ART CONTINUITY
         </text>
       </g>
     </g>
@@ -994,14 +1022,14 @@ app.get('/api/scene-image/:id', (req, res) => {
     language: lang,
   });
 
-  sceneImageCache.set(id, generatedSvg);
+  setSceneImageCache(id, generatedSvg);
   res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.send(generatedSvg);
 });
 
 // 2. Real-time Consistent Image Generation
-app.post('/api/image/generate', async (req, res) => {
+app.post(['/api/image/generate', '/api/scene-art/generate'], async (req, res) => {
   const startTime = Date.now();
   const {
     artStylePrompt = '',
@@ -1039,20 +1067,11 @@ app.post('/api/image/generate', async (req, res) => {
     .join(' ');
 
   try {
-    const modelsToTry = [
-      'gemini-3-pro-image-preview',
-      'gemini-3-pro-image',
-      'gemini-nano-banana-2.1',
-      'gemini-3.1-flash-lite-image',
-    ];
+    const modelsToTry = ['gemini-2.5-flash-image'];
 
-    const { response, modelUsed } = await generateWithFallback(modelsToTry, (model) => {
-      const supportsSize =
-        model === 'gemini-3-pro-image-preview' ||
-        model === 'gemini-3-pro-image' ||
-        model === 'gemini-nano-banana-2.1';
-
-      return {
+    const { response, modelUsed } = await generateWithFallback(
+      modelsToTry,
+      (model) => ({
         model,
         contents: {
           parts: [{ text: fullVisualPrompt }],
@@ -1060,11 +1079,11 @@ app.post('/api/image/generate', async (req, res) => {
         config: {
           imageConfig: {
             aspectRatio,
-            ...(supportsSize ? { imageSize: validSize } : {}),
           },
         },
-      };
-    });
+      }),
+      true
+    );
 
     let imageUrl: string | null = null;
     const parts = response.candidates?.[0]?.content?.parts || [];
@@ -1115,7 +1134,7 @@ app.post('/api/image/generate', async (req, res) => {
       turnNumber: 2,
       language,
     });
-    sceneImageCache.set(sceneId, fallbackSvg);
+    setSceneImageCache(sceneId, fallbackSvg);
 
     res.json({
       imageUrl: `/api/scene-image/${sceneId}?v=${Date.now()}`,
@@ -1131,456 +1150,6 @@ app.post('/api/image/generate', async (req, res) => {
     });
   }
 });
-
-// ==========================================
-// SCENE BACKGROUND ART ENGINE (1 & 2)
-// ==========================================
-
-// Simple CRC32 helper for clean zip exports
-function crc32(buf: Buffer): number {
-  let crc = ~0;
-  for (let i = 0; i < buf.length; i++) {
-    let byte = buf[i];
-    crc ^= byte;
-    for (let j = 0; j < 8; j++) {
-      crc = (crc >>> 1) ^ (-(crc & 1) & 0xedb88320);
-    }
-  }
-  return ~crc >>> 0;
-}
-
-// 1. Frame visual description extracted from narrative
-app.post('/api/scene-art/describe', async (req, res) => {
-  const startTime = Date.now();
-  try {
-    const {
-      worldId = 'world',
-      sceneId,
-      location = '',
-      narrative = [],
-      artStylePrompt = '',
-    } = req.body || {};
-
-    if (!sceneId) {
-      return res.status(400).json({ error: 'sceneId is required' });
-    }
-
-    const cacheKey = `${worldId}_${sceneId}`;
-
-    // 1. In-memory cache
-    if (scenePromptMemoryCache.has(cacheKey)) {
-      return res.json({
-        sceneId,
-        visualDescription: scenePromptMemoryCache.get(cacheKey),
-        cached: true,
-        source: 'memory',
-        latencyMs: Date.now() - startTime,
-      });
-    }
-
-    // 2. Disk cache (.cache/scene_prompts/)
-    const diskPromptFile = path.join(SCENE_PROMPTS_CACHE_DIR, `${cacheKey}.json`);
-    if (fs.existsSync(diskPromptFile)) {
-      try {
-        const fileContent = JSON.parse(fs.readFileSync(diskPromptFile, 'utf-8'));
-        if (fileContent?.visualDescription) {
-          scenePromptMemoryCache.set(cacheKey, fileContent.visualDescription);
-          return res.json({
-            sceneId,
-            visualDescription: fileContent.visualDescription,
-            cached: true,
-            source: 'disk',
-            latencyMs: Date.now() - startTime,
-          });
-        }
-      } catch (err) {
-        console.warn(`Failed to parse disk prompt cache for ${cacheKey}:`, err);
-      }
-    }
-
-    // 3. Narrative normalization (first 2-3 pages/paragraphs)
-    const narrativeText = Array.isArray(narrative)
-      ? narrative.slice(0, 3).join('\n')
-      : String(narrative || '').slice(0, 1000);
-
-    const systemInstruction = `You are an expert art director and concept artist for interactive dark fiction.
-Given the scene location, world art style, and narrative excerpt, write EXACTLY ONE single descriptive paragraph in English (strictly 30 to 50 words) depicting the environment background.
-REQUIRED ELEMENTS:
-- Specific room interior or exterior landscape and architectural scale
-- Key environmental objects mentioned in the narrative text
-- Light source, light quality, time of day or atmospheric weather
-- Color mood and emotional ambiance
-STRICT CONSTRAINTS:
-- NO close-up people or portraits.
-- NO readable text, lettering, runes, signs, watermarks, interface frames, or HUD.
-- NO real-world commercial brand names.
-- Output ONLY the raw English paragraph. No preamble, no quotes, no markdown.`;
-
-    const userPrompt = `World Art Style: ${artStylePrompt}
-Location: ${location}
-Scene Narrative (first 2-3 pages):
-"""
-${narrativeText}
-"""
-
-English environment frame description (30-50 words):`;
-
-    const textModels = [
-      'gemini-2.5-flash',
-      'gemini-3-flash',
-      'gemini-2.5-pro',
-    ];
-
-    const { response } = await generateWithFallback(
-      textModels,
-      (model) => ({
-        model,
-        contents: {
-          parts: [{ text: userPrompt }],
-        },
-        config: {
-          systemInstruction,
-          temperature: 0.4,
-        },
-      }),
-      { sceneId, stage: 'describe' }
-    );
-
-    let rawDesc = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    rawDesc = rawDesc
-      .replace(/^["'`]+|["'`]+$/g, '')
-      .replace(/^(Description|Frame description|Scene composition):/i, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    if (!rawDesc) {
-      rawDesc = `Atmospheric wide view of ${location || 'the area'}, dramatic lighting and deep volumetric shadows, authentic to ${artStylePrompt.slice(0, 80)}.`;
-    }
-
-    // Save to disk & memory cache
-    scenePromptMemoryCache.set(cacheKey, rawDesc);
-    try {
-      fs.writeFileSync(
-        diskPromptFile,
-        JSON.stringify({ sceneId, worldId, visualDescription: rawDesc, timestamp: Date.now() }, null, 2)
-      );
-    } catch (saveErr) {
-      console.warn('Could not write prompt to disk cache:', saveErr);
-    }
-
-    return res.json({
-      sceneId,
-      visualDescription: rawDesc,
-      cached: false,
-      source: 'gemini',
-      latencyMs: Date.now() - startTime,
-    });
-  } catch (error: any) {
-    const errCode = error?.status || error?.code || 500;
-    const errSnippet = String(error?.message || error).replace(/\r?\n|\r/g, ' ').slice(0, 150);
-    console.log(`[SceneArt] ${req.body?.sceneId || 'unknown'} | describe | model: all_failed | HTTP ${errCode}: ${errSnippet} | ${Date.now() - startTime}ms`);
-    return res.status(errCode).json({
-      sceneId: req.body?.sceneId || 'unknown',
-      error: errSnippet,
-      fallback: true,
-      latencyMs: Date.now() - startTime,
-    });
-  }
-});
-
-// 2. Generate scene background image and save to disk
-app.post('/api/scene-art/generate', async (req, res) => {
-  const startTime = Date.now();
-  const {
-    worldId = 'world',
-    sceneId,
-    artStylePrompt = '',
-    frameDescription = '',
-    activeSpeaker = null,
-    worldCoverImage = '',
-    quality = 'fast',
-    imageSize = '1K',
-    aspectRatio = '16:9',
-  } = req.body || {};
-
-  if (!sceneId) {
-    return res.status(400).json({ error: 'sceneId is required' });
-  }
-
-  const cacheKey = `${worldId}_${sceneId}`;
-  const diskImagePath = path.join(SCENE_IMAGES_CACHE_DIR, `${cacheKey}.png`);
-
-  // 1. Check disk cache
-  if (fs.existsSync(diskImagePath)) {
-    return res.json({
-      imageUrl: `/api/scene-art/image/${worldId}/${sceneId}`,
-      cached: true,
-      source: 'disk',
-      latencyMs: Date.now() - startTime,
-    });
-  }
-
-  // 2. Build prompt strictly according to requirements:
-  // MASTER ART STYLE мира + описание кадра из п.1 + «wide cinematic 16:9 environment, painterly, no text, no watermark, no UI».
-  // Персонажей добавляй, только если у сцены есть activeSpeaker, и тогда используй их visualDescriptor.
-  const characterClause =
-    activeSpeaker && activeSpeaker.name
-      ? `Present figure: ${activeSpeaker.name}${
-          activeSpeaker.visualDescriptor ? ` (${activeSpeaker.visualDescriptor})` : ''
-        }.`
-      : '';
-
-  const fullVisualPrompt = [
-    `MASTER ART STYLE: ${artStylePrompt}.`,
-    `ENVIRONMENT COMPOSITION: ${frameDescription}.`,
-    characterClause,
-    `wide cinematic 16:9 environment, painterly, no text, no watermark, no UI.`,
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  const validSize: '1K' | '2K' | '4K' =
-    quality === 'better' || imageSize === '2K' || imageSize === '4K' ? '2K' : '1K';
-
-  // Read world coverImage from disk as base64 reference if available
-  let coverImageBase64: string | null = null;
-  let coverImageMime = 'image/webp';
-  if (worldCoverImage) {
-    try {
-      const cleanPath = worldCoverImage.replace(/^\//, '');
-      const fullPath = path.join(__dirname, cleanPath);
-      if (fs.existsSync(fullPath)) {
-        const fileBuf = fs.readFileSync(fullPath);
-        coverImageBase64 = fileBuf.toString('base64');
-        if (cleanPath.endsWith('.png')) coverImageMime = 'image/png';
-        else if (cleanPath.endsWith('.jpg') || cleanPath.endsWith('.jpeg')) coverImageMime = 'image/jpeg';
-        else if (cleanPath.endsWith('.webp')) coverImageMime = 'image/webp';
-      }
-    } catch {}
-  }
-
-  const imageModels =
-    quality === 'better'
-      ? ['gemini-3-pro-image-preview', 'gemini-3-pro-image', 'gemini-nano-banana-2.1', 'gemini-3.1-flash-lite-image']
-      : ['gemini-nano-banana-2.1', 'gemini-3.1-flash-lite-image', 'gemini-3-pro-image-preview', 'gemini-3-pro-image'];
-
-    const { response, modelUsed } = await generateWithFallback(
-      imageModels,
-      (model) => {
-        const supportsSize =
-          model === 'gemini-3-pro-image-preview' ||
-          model === 'gemini-3-pro-image' ||
-          model === 'gemini-nano-banana-2.1';
-
-        const supportsRef =
-          coverImageBase64 &&
-          (model === 'gemini-3-pro-image-preview' ||
-            model === 'gemini-3-pro-image' ||
-            model === 'gemini-nano-banana-2.1');
-
-        const parts: any[] = [];
-        if (supportsRef) {
-          parts.push({
-            inlineData: {
-              mimeType: coverImageMime,
-              data: coverImageBase64,
-            },
-          });
-          parts.push({
-            text: `Match visual painterly style with reference image above. ${fullVisualPrompt}`,
-          });
-        } else {
-          parts.push({ text: fullVisualPrompt });
-        }
-
-        return {
-          model,
-          contents: { parts },
-          config: {
-            imageConfig: {
-              aspectRatio,
-              ...(supportsSize ? { imageSize: validSize } : {}),
-            },
-          },
-        };
-      },
-      { sceneId, stage: 'generate' }
-    );
-
-    let imageBuffer: Buffer | null = null;
-    const parts = response.candidates?.[0]?.content?.parts || [];
-    for (const part of parts) {
-      if (part.inlineData?.data) {
-        imageBuffer = Buffer.from(part.inlineData.data, 'base64');
-        break;
-      }
-    }
-
-    if (!imageBuffer) {
-      throw new Error('No image binary returned from Gemini model.');
-    }
-
-    // Save image to disk cache
-    fs.writeFileSync(diskImagePath, imageBuffer);
-
-    return res.json({
-      imageUrl: `/api/scene-art/image/${worldId}/${sceneId}?v=${Date.now()}`,
-      promptUsed: fullVisualPrompt,
-      modelUsed,
-      imageSize: validSize,
-      cached: false,
-      latencyMs: Date.now() - startTime,
-    });
-  } catch (err: any) {
-    const errCode = err?.status || err?.code || 500;
-    const errSnippet = String(err?.message || err).replace(/\r?\n|\r/g, ' ').slice(0, 150);
-    console.log(`[SceneArt] ${sceneId} | generate | model: all_failed | HTTP ${errCode}: ${errSnippet} | ${Date.now() - startTime}ms`);
-
-    return res.status(errCode).json({
-      error: errSnippet,
-      status: errCode,
-      sceneId,
-      cached: false,
-      latencyMs: Date.now() - startTime,
-    });
-  }
-});
-
-// Serve cached PNG file from disk
-app.get('/api/scene-art/image/:worldId/:sceneId', (req, res) => {
-  const { worldId, sceneId } = req.params;
-  const filePath = path.join(SCENE_IMAGES_CACHE_DIR, `${worldId}_${sceneId}.png`);
-  if (fs.existsSync(filePath)) {
-    res.setHeader('Content-Type', 'image/png');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    return fs.createReadStream(filePath).pipe(res);
-  }
-  return res.status(404).send('Not found in disk cache');
-});
-
-// Fast check if scene is already cached on disk
-app.get('/api/scene-art/check-cache/:worldId/:sceneId', (req, res) => {
-  const { worldId, sceneId } = req.params;
-  const filePath = path.join(SCENE_IMAGES_CACHE_DIR, `${worldId}_${sceneId}.png`);
-  if (fs.existsSync(filePath)) {
-    return res.json({
-      cached: true,
-      imageUrl: `/api/scene-art/image/${worldId}/${sceneId}`,
-    });
-  }
-  return res.json({ cached: false });
-});
-
-// Return list of cached scenes for a world (for developer progress)
-app.get('/api/scene-art/cached-scenes/:worldId', (req, res) => {
-  const { worldId } = req.params;
-  try {
-    const files = fs.readdirSync(SCENE_IMAGES_CACHE_DIR);
-    const prefix = `${worldId}_`;
-    const sceneIds = files
-      .filter((f) => f.startsWith(prefix) && f.endsWith('.png'))
-      .map((f) => f.slice(prefix.length, -4));
-    return res.json({ worldId, cachedSceneIds: sceneIds, totalCached: sceneIds.length });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
-  }
-});
-
-// Developer ZIP export of cached images for a world
-app.get('/api/scene-art/export-zip/:worldId', (req, res) => {
-  const { worldId } = req.params;
-  try {
-    const files = fs.readdirSync(SCENE_IMAGES_CACHE_DIR);
-    const prefix = `${worldId}_`;
-    const targetFiles = files.filter((f) => f.startsWith(prefix) && f.endsWith('.png'));
-
-    if (targetFiles.length === 0) {
-      return res.status(404).send('No cached images found for this world.');
-    }
-
-    // Build uncompressed ZIP file stream in memory
-    const zipChunks: Buffer[] = [];
-    const centralDirectoryHeaders: Buffer[] = [];
-    let offset = 0;
-
-    for (const fileName of targetFiles) {
-      const fullPath = path.join(SCENE_IMAGES_CACHE_DIR, fileName);
-      const data = fs.readFileSync(fullPath);
-      const nameBuffer = Buffer.from(fileName, 'utf-8');
-      const fileCrc = crc32(data);
-
-      // Local file header (30 bytes + name length)
-      const localHeader = Buffer.alloc(30 + nameBuffer.length);
-      localHeader.writeUInt32LE(0x04034b50, 0); // signature
-      localHeader.writeUInt16LE(20, 4);         // version needed
-      localHeader.writeUInt16LE(0, 6);          // flags
-      localHeader.writeUInt16LE(0, 8);          // compression method (0 = store)
-      localHeader.writeUInt16LE(0, 10);         // mod time
-      localHeader.writeUInt16LE(0, 12);         // mod date
-      localHeader.writeUInt32LE(fileCrc, 14);   // crc32
-      localHeader.writeUInt32LE(data.length, 18); // compressed size
-      localHeader.writeUInt32LE(data.length, 22); // uncompressed size
-      localHeader.writeUInt16LE(nameBuffer.length, 26); // name length
-      localHeader.writeUInt16LE(0, 28);         // extra field length
-      nameBuffer.copy(localHeader, 30);
-
-      zipChunks.push(localHeader);
-      zipChunks.push(data);
-
-      // Central directory header (46 bytes + name length)
-      const cdHeader = Buffer.alloc(46 + nameBuffer.length);
-      cdHeader.writeUInt32LE(0x02014b50, 0);    // signature
-      cdHeader.writeUInt16LE(20, 4);            // version made by
-      cdHeader.writeUInt16LE(20, 6);            // version needed
-      cdHeader.writeUInt16LE(0, 8);             // flags
-      cdHeader.writeUInt16LE(0, 10);            // method
-      cdHeader.writeUInt16LE(0, 12);            // mod time
-      cdHeader.writeUInt16LE(0, 14);            // mod date
-      cdHeader.writeUInt32LE(fileCrc, 16);      // crc32
-      cdHeader.writeUInt32LE(data.length, 20);  // compressed size
-      cdHeader.writeUInt32LE(data.length, 24);  // uncompressed size
-      cdHeader.writeUInt16LE(nameBuffer.length, 28); // name length
-      cdHeader.writeUInt16LE(0, 30);            // extra length
-      cdHeader.writeUInt16LE(0, 32);            // comment length
-      cdHeader.writeUInt16LE(0, 34);            // disk number
-      cdHeader.writeUInt16LE(0, 36);            // internal attrs
-      cdHeader.writeUInt32LE(0, 38);            // external attrs
-      cdHeader.writeUInt32LE(offset, 42);       // relative offset of local header
-      nameBuffer.copy(cdHeader, 46);
-
-      centralDirectoryHeaders.push(cdHeader);
-      offset += localHeader.length + data.length;
-    }
-
-    const cdOffset = offset;
-    let cdSize = 0;
-    for (const cdh of centralDirectoryHeaders) {
-      zipChunks.push(cdh);
-      cdSize += cdh.length;
-    }
-
-    // End of Central Directory record (22 bytes)
-    const eocd = Buffer.alloc(22);
-    eocd.writeUInt32LE(0x06054b50, 0);          // signature
-    eocd.writeUInt16LE(0, 4);                   // disk number
-    eocd.writeUInt16LE(0, 6);                   // start disk
-    eocd.writeUInt16LE(targetFiles.length, 8);  // entries on disk
-    eocd.writeUInt16LE(targetFiles.length, 10); // total entries
-    eocd.writeUInt32LE(cdSize, 12);             // size of central directory
-    eocd.writeUInt32LE(cdOffset, 16);           // offset of cd
-    eocd.writeUInt16LE(0, 20);                  // comment length
-    zipChunks.push(eocd);
-
-    const fullZip = Buffer.concat(zipChunks);
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${worldId}_scenes.zip"`);
-    res.setHeader('Content-Length', fullZip.length);
-    return res.end(fullZip);
-  } catch (err: any) {
-    return res.status(500).send(`ZIP generation failed: ${err?.message}`);
-  }
-});
-
 
 // 2b. Item & Relic Visual Art Generation / Retrieval
 const itemArtCache = new Map<string, string>();
@@ -1603,24 +1172,23 @@ app.post('/api/item-art', async (req, res) => {
     } Dark chiaroscuro, centered object on dark textured background, ornate detailing, volumetric magical lighting, no text, no interface frames, square composition.`;
 
     try {
-      const modelsToTry = [
-        'gemini-3.1-flash-lite-image',
-        'gemini-nano-banana-2.1',
-        'gemini-3-pro-image',
-        'gemini-3-pro-image-preview',
-      ];
+      const modelsToTry = ['gemini-2.5-flash-image'];
 
-      const { response, modelUsed } = await generateWithFallback(modelsToTry, (model) => ({
-        model,
-        contents: {
-          parts: [{ text: itemVisualPrompt }],
-        },
-        config: {
-          imageConfig: {
-            aspectRatio: '1:1',
+      const { response, modelUsed } = await generateWithFallback(
+        modelsToTry,
+        (model) => ({
+          model,
+          contents: {
+            parts: [{ text: itemVisualPrompt }],
           },
-        },
-      }));
+          config: {
+            imageConfig: {
+              aspectRatio: '1:1',
+            },
+          },
+        }),
+        true
+      );
 
       const parts = response.candidates?.[0]?.content?.parts || [];
       for (const part of parts) {
@@ -1646,14 +1214,22 @@ app.post('/api/item-art', async (req, res) => {
       latencyMs: Date.now() - startTime,
     });
   } catch (error: any) {
-    res.status(500).json({ error: error?.message || 'Failed to generate item art' });
+    res.status(200).json({ imageUrl: null, isQuotaFallback: true, latencyMs: Date.now() - startTime });
   }
 });
 
-// 3. Low-Latency Responses with gemini-3.1-flash-lite ("Sixth Sense" & Instant Item/Choice Intuition)
+// 3. Low-Latency Responses with gemini-2.5-flash-lite ("Sixth Sense" & Instant Item/Choice Intuition)
 app.post('/api/instinct/quick', async (req, res) => {
   const startTime = Date.now();
   try {
+    if (Date.now() < textQuotaCooldownUntil) {
+      return res.status(200).json({
+        insight: 'Интуиция молчит — тени вокруг слишком густы.',
+        modelUsed: 'fallback',
+        latencyMs: 0,
+      });
+    }
+
     const {
       mode,
       targetName,
@@ -1679,27 +1255,35 @@ Give a rapid 2-sentence "Sixth Sense" tactical scan ${isRu ? 'in RUSSIAN' : ''} 
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite',
+      model: 'gemini-2.5-flash-lite',
       contents: prompt,
       config: {
         systemInstruction: isRu
           ? 'Вы — мгновенное шестое чувство игрока в текстовом квесте. Отвечайте на чистом, образном, лаконичном русском языке (до 45 слов).'
           : 'You are the player’s instant Sixth Sense instinct in an interactive adventure game. Be razor-sharp, atmospheric, and concise (max 45 words).',
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.MINIMAL,
-        },
       },
     });
 
     res.json({
-      insight: response.text || 'Your instincts sense shifting currents in the shadows.',
-      modelUsed: 'gemini-3.1-flash-lite',
+      insight: response.text || 'Интуиция молчит — тени вокруг слишком густы.',
+      modelUsed: 'gemini-2.5-flash-lite',
       latencyMs: Date.now() - startTime,
     });
   } catch (error: any) {
+    const isQuotaError =
+      error?.status === 429 ||
+      error?.code === 429 ||
+      String(error?.message || '').includes('429') ||
+      String(error?.message || '').includes('RESOURCE_EXHAUSTED') ||
+      String(error?.message || '').toLowerCase().includes('quota');
+    if (isQuotaError) {
+      textQuotaCooldownUntil = Date.now() + 60000;
+    }
     console.error('Quick instinct error:', error);
-    res.status(500).json({
-      error: error?.message || 'Failed to run low-latency instinct scan.',
+    res.status(200).json({
+      insight: 'Интуиция молчит — тени вокруг слишком густы.',
+      modelUsed: 'fallback',
+      latencyMs: 0,
     });
   }
 });
@@ -1707,37 +1291,54 @@ Give a rapid 2-sentence "Sixth Sense" tactical scan ${isRu ? 'in RUSSIAN' : ''} 
 // 4. Multi-Turn Gemini Chatbot ("The Chronicler & Lore Oracle")
 app.post('/api/oracle/chat', async (req, res) => {
   const startTime = Date.now();
+  const { modelTier = 'gemini-2.5-flash' } = req.body || {};
   try {
+    if (Date.now() < textQuotaCooldownUntil) {
+      return res.status(200).json({
+        reply: 'Связь с эфиром временно нарушена магическим штормом (достигнут лимит запросов API). Подожди минуту и спроси снова.',
+        modelUsed: 'fallback',
+        requestedTier: modelTier,
+        latencyMs: 0,
+      });
+    }
+
     const {
       message,
       history = [],
-      modelTier = 'gemini-3.5-flash',
       worldContext,
       language = 'ru',
     } = req.body;
 
     const isRu = language === 'ru';
     const roleDescriptionsRu: Record<string, string> = {
-      'gemini-3.1-pro-preview':
-        'Вы — Мастер лора и главный архитектор вселенной. Анализируйте скрытые сюжетные линии, тайные мотивы фракций, древние тайны мира и долговременные последствия выборов игрока.',
+      'gemini-2.5-flash':
+        'Вы — Спутник-летописец, внимательный спутник главного героя. Обсуждайте события, поддерживайте атмосферный диалог от лица спутника и помогайте связать улики из инвентаря с текущим заданием.',
       'gemini-3.5-flash':
         'Вы — Спутник-летописец, внимательный спутник главного героя. Обсуждайте события, поддерживайте атмосферный диалог от лица спутника и помогайте связать улики из инвентаря с текущим заданием.',
+      'gemini-2.5-flash-lite':
+        'Вы — Тактический шёпот, мгновенный внутренний голос героя. Давайте быстрые, точные, лаконичные тактические советы и подсказки в 1–3 ёмких предложениях.',
       'gemini-3.1-flash-lite':
         'Вы — Тактический шёпот, мгновенный внутренний голос героя. Давайте быстрые, точные, лаконичные тактические советы и подсказки в 1–3 ёмких предложениях.',
+      'gemini-3.1-pro-preview':
+        'Вы — Верховный Хранитель Летописи. Глубоко анализируйте мотивы фракций, скрытые символические связи, древние реликвии и тонкие последствия решений героя.',
     };
 
     const roleDescriptionsEn: Record<string, string> = {
-      'gemini-3.1-pro-preview':
-        'You are the Grand Lore Architect — a master worldbuilder and deep narrative strategist. Analyze complex plot threads, hidden faction motives, deep lore mysteries, and long-term butterfly effects of the player’s choices.',
+      'gemini-2.5-flash':
+        'You are the Chronicler Companion — an observant in-world scribe travelling alongside the protagonist. Discuss characters, recap events, roleplay in-character banter, and help connect inventory clues to the current quest.',
       'gemini-3.5-flash':
         'You are the Chronicler Companion — an observant in-world scribe travelling alongside the protagonist. Discuss characters, recap events, roleplay in-character banter, and help connect inventory clues to the current quest.',
+      'gemini-2.5-flash-lite':
+        'You are the Tactical Whisper — an ultra-fast inner instinct delivering immediate, punchy, low-latency tactical answers and quick survival tips in 1-3 short sentences.',
       'gemini-3.1-flash-lite':
         'You are the Tactical Whisper — an ultra-fast inner instinct delivering immediate, punchy, low-latency tactical answers and quick survival tips in 1-3 short sentences.',
+      'gemini-3.1-pro-preview':
+        'You are the Arch-Chronicler — deeply analyzing faction motives, ancient lore connections, relic secrets, and subtle consequences of the hero’s choices.',
     };
 
     const roleMap = isRu ? roleDescriptionsRu : roleDescriptionsEn;
     const systemInstruction = `${
-      roleMap[modelTier] || roleMap['gemini-3.5-flash']
+      roleMap[modelTier] || roleMap['gemini-2.5-flash']
     }
 
 CURRENT ADVENTURE STATE:
@@ -1751,24 +1352,30 @@ CURRENT ADVENTURE STATE:
 ${isRu ? 'ОТВЕЧАЙТЕ НА КРАСИВОМ, ГРАМОТНОМ И ЛИТЕРАТУРНОМ РУССКОМ ЯЗЫКЕ.' : 'Respond in clear, immersive English.'}
 Stay grounded in the player's actual story state, inventory, and characters.`;
 
-    const fallbackChain =
-      modelTier === 'gemini-3.1-pro-preview'
-        ? ['gemini-3.1-pro-preview', 'gemini-3.8-flash', 'gemini-3.1-flash-lite']
-        : modelTier === 'gemini-3.1-flash-lite'
-        ? ['gemini-3.1-flash-lite', 'gemini-3.8-flash']
-        : ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+    const fallbackChain = resolveTextModels(modelTier);
 
     const ai = getGenAI();
     let replyText = '';
     let actualModelUsed = modelTier;
-    let lastErr: any = null;
 
-    const formattedHistory = (history || [])
-      .filter((h: any) => h && h.text)
+    // Sanitize chat history: drop leading model greeting and avoid duplicating current user message
+    const rawHistory = (Array.isArray(history) ? history : [])
+      .filter((h: any) => h && typeof h.text === 'string' && h.text.trim().length > 0)
       .map((h: any) => ({
         role: h.role === 'model' ? 'model' : 'user',
         parts: [{ text: h.text }],
       }));
+    while (rawHistory.length > 0 && rawHistory[0].role !== 'user') {
+      rawHistory.shift();
+    }
+    if (
+      rawHistory.length > 0 &&
+      rawHistory[rawHistory.length - 1].role === 'user' &&
+      rawHistory[rawHistory.length - 1].parts[0].text.trim() === String(message || '').trim()
+    ) {
+      rawHistory.pop();
+    }
+    const formattedHistory = rawHistory;
 
     for (const candidateModel of fallbackChain) {
       try {
@@ -1777,9 +1384,6 @@ Stay grounded in the player's actual story state, inventory, and characters.`;
           history: formattedHistory,
           config: {
             systemInstruction,
-            ...(candidateModel === 'gemini-3.1-flash-lite'
-              ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } }
-              : {}),
           },
         });
 
@@ -1788,13 +1392,29 @@ Stay grounded in the player's actual story state, inventory, and characters.`;
         actualModelUsed = candidateModel;
         break;
       } catch (err: any) {
-        lastErr = err;
+        const isQuotaError =
+          err?.status === 429 ||
+          err?.code === 429 ||
+          String(err?.message || '').includes('429') ||
+          String(err?.message || '').includes('RESOURCE_EXHAUSTED') ||
+          String(err?.message || '').toLowerCase().includes('quota');
+
+        if (isQuotaError) {
+          textQuotaCooldownUntil = Date.now() + 60000;
+          console.warn(`Oracle chat quota hit on ${candidateModel}, setting 60s cooldown.`);
+          break;
+        }
         console.warn(`Chat model ${candidateModel} failed, trying fallback...`);
       }
     }
 
-    if (!replyText && lastErr) {
-      throw lastErr;
+    if (!replyText) {
+      return res.status(200).json({
+        reply: 'Связь с эфиром временно нарушена магическим штормом (достигнут лимит запросов API). Подожди минуту и спроси снова.',
+        modelUsed: 'fallback',
+        requestedTier: modelTier,
+        latencyMs: 0,
+      });
     }
 
     res.json({
@@ -1805,10 +1425,339 @@ Stay grounded in the player's actual story state, inventory, and characters.`;
     });
   } catch (error: any) {
     console.error('Oracle chat error:', error);
-    res.status(500).json({
-      error: error?.message || 'Oracle chat failed to respond.',
+    res.status(200).json({
+      reply: 'Связь с эфиром временно нарушена магическим штормом (достигнут лимит запросов API). Подожди минуту и спроси снова.',
+      modelUsed: 'fallback',
+      requestedTier: modelTier,
+      latencyMs: 0,
     });
   }
+});
+
+// All 105 canonical scene IDs across the 3 worlds
+const KNOWN_WORLD_SCENES: Record<string, string[]> = {
+  vaelen: [
+    'v_causeway_entrance', 'v_weeping_cloisters', 'v_sunken_belltower', 'v_causeway_illuminated',
+    'v_parapet_ambush', 'v_ghoul_nest_loot', 'v_sluice_antechamber', 'v_coral_catacombs',
+    'v_salt_mine_shaft', 'v_abyssal_observatory', 'v_salt_chapel', 'v_chapel_blessing',
+    'v_chapel_memory_vision', 'v_pump_mechanism', 'v_scriptorium_entry', 'v_drowned_scriptorium_depths',
+    'v_forgotten_crypt', 'v_scriptorium_codex', 'v_scriptorium_reliquary', 'v_abyssal_chasm',
+    'v_sentinel_combat', 'v_sentinel_relic_choice', 'v_sentinel_relic_lantern', 'v_sentinel_relic_fork',
+    'v_sentinel_sacrifice', 'v_inner_sanctum_approach', 'v_astrolabe_dais', 'v_ending_tide_lord',
+    'v_ending_dam_break', 'v_ending_seal_ward', 'v_ending_defeat_hp', 'v_ending_defeat_sanity',
+    'v_prologue_salt_vault', 'v_prologue_crossing', 'v_gate_echo_oyvin', 'v_cloister_mara',
+    'v_tidewarden_barracks', 'v_memory_market', 'v_camp_salt_fire', 'v_observatory_star',
+    'v_chapel_isolde', 'v_scriptorium_truth', 'v_sera_confession', 'v_scriptorium_archives',
+    'v_bridge_eve', 'v_sentinel_recall', 'v_sentinel_defeated', 'v_throne_prima',
+    'v_king_echo', 'v_ending_return', 'v_ending_new_sentinel',
+  ],
+  vespera: [
+    'vesp_workshop_scene', 'vesp_corpse_clues', 'vesp_vent_trail', 'vesp_decoded_telegram',
+    'vesp_catacombs_entry', 'vesp_guards_firefight', 'vesp_steam_valve_puzzle', 'vesp_inquisitor_chamber',
+    'vesp_inquisitor_combat', 'vesp_inquisitor_chronometer', 'vesp_inquisitor_whistle', 'vesp_inquisitor_sacrifice',
+    'vesp_cathedral_dais', 'vesp_ending_justice', 'vesp_ending_architect', 'vesp_ending_sabotage',
+    'vesp_ending_defeat_hp', 'vesp_ending_defeat_sanity',
+  ],
+  astral: [
+    'astral_deck_scene', 'astral_whale_graveyard', 'astral_plasma_dive', 'astral_crystal_salvage',
+    'astral_spire_approach', 'astral_spire_aligned', 'astral_gates_leviathan', 'astral_leviathan_combat',
+    'astral_leviathan_prism', 'astral_leviathan_shard', 'astral_leviathan_sacrifice', 'astral_beacon_dais',
+    'astral_ending_beacon', 'astral_ending_merge', 'astral_ending_constellations', 'astral_ending_defeat_hp',
+    'astral_ending_defeat_sanity', 'astral_prologue_harbor', 'astral_prologue_crew', 'astral_aurora_drift',
+    'astral_whale_song', 'astral_lotus_arrival', 'astral_lotus_feast', 'astral_lotus_dream',
+    'astral_siren_strait', 'astral_admiral_ambush', 'astral_selestia_garden', 'astral_observatory_truth',
+    'astral_orion_confession', 'astral_leviathan_truth', 'astral_gates_beyond', 'astral_admiral_final',
+    'astral_beacon_ascent', 'astral_ending_return', 'astral_ending_fleet', 'astral_ending_free_sky',
+  ],
+};
+
+// Helper: updates public/scenes/manifest.json in format {"scenes": {"<id>": <timestamp>}}
+function updateManifestWithScene(sceneId: string): { version: number; totalReady: number } {
+  const scenesDir = path.resolve(__dirname, 'public', 'scenes');
+  if (!fs.existsSync(scenesDir)) {
+    fs.mkdirSync(scenesDir, { recursive: true });
+  }
+  const manifestPath = path.resolve(scenesDir, 'manifest.json');
+  let scenesDict: Record<string, number> = {};
+
+  if (fs.existsSync(manifestPath)) {
+    try {
+      const raw = fs.readFileSync(manifestPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (const id of parsed) {
+          if (typeof id === 'string' && id.trim()) scenesDict[id.trim()] = 1;
+        }
+      } else if (parsed?.scenes) {
+        if (Array.isArray(parsed.scenes)) {
+          for (const id of parsed.scenes) {
+            if (typeof id === 'string' && id.trim()) scenesDict[id.trim()] = 1;
+          }
+        } else if (typeof parsed.scenes === 'object') {
+          for (const [id, ver] of Object.entries(parsed.scenes)) {
+            if (typeof id === 'string' && id.trim()) {
+              scenesDict[id.trim()] = typeof ver === 'number' ? ver : 1;
+            }
+          }
+        }
+      }
+    } catch {
+      scenesDict = {};
+    }
+  }
+
+  const version = Date.now();
+  scenesDict[sceneId] = version;
+  fs.writeFileSync(manifestPath, JSON.stringify({ scenes: scenesDict }, null, 2), 'utf8');
+
+  return { version, totalReady: Object.keys(scenesDict).length };
+}
+
+// Dev Studio: Scene Art generation endpoint
+app.post('/api/dev/scene-art', async (req, res) => {
+  const isDevArt = process.env.DEV_ART === '1' || process.env.NODE_ENV !== 'production';
+  if (!isDevArt) {
+    return res.status(403).json({ error: 'Dev art generation disabled in production' });
+  }
+
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(401).json({
+      error: 'AUTH_ERROR',
+      reason: 'no_api_key',
+      message: 'Нет рабочего ключа Gemini',
+    });
+  }
+
+  const { worldId, sceneId, prompt, worldCoverImage } = req.body || {};
+
+  if (!sceneId || typeof sceneId !== 'string' || !/^[a-z0-9_]+$/.test(sceneId)) {
+    return res.status(400).json({ error: 'Invalid sceneId: only [a-z0-9_] allowed' });
+  }
+
+  const allKnownScenes = Object.values(KNOWN_WORLD_SCENES).flat();
+  const worldScenes = worldId && KNOWN_WORLD_SCENES[worldId] ? KNOWN_WORLD_SCENES[worldId] : allKnownScenes;
+  if (!worldScenes.includes(sceneId)) {
+    return res.status(400).json({ error: `Scene '${sceneId}' does not exist in world '${worldId || 'any'}'` });
+  }
+
+  const parts: any[] = [];
+
+  // Pass world cover image as style reference if provided and safely confined to public/
+  if (worldCoverImage && typeof worldCoverImage === 'string') {
+    try {
+      const publicDir = path.resolve(__dirname, 'public');
+      const cleanPath = worldCoverImage.split('?')[0].replace(/^\/+/, '');
+      const coverPath = path.resolve(publicDir, cleanPath);
+      if (coverPath.startsWith(publicDir + path.sep) && fs.existsSync(coverPath) && fs.statSync(coverPath).isFile()) {
+        const buf = fs.readFileSync(coverPath);
+        const ext = path.extname(coverPath).toLowerCase();
+        const mime =
+          ext === '.png'
+            ? 'image/png'
+            : ext === '.jpg' || ext === '.jpeg'
+            ? 'image/jpeg'
+            : 'image/webp';
+        parts.push({
+          inlineData: {
+            data: buf.toString('base64'),
+            mimeType: mime,
+          },
+        });
+      }
+    } catch (err) {
+      console.warn('[Dev Scene Art] Cover read error:', err);
+    }
+  }
+
+  const resolvedPrompt =
+    prompt ||
+    SCENE_IMAGE_PROMPTS[sceneId] ||
+    `Cinematic illustration for scene ${sceneId}. Wide cinematic 16:9 composition, no text, no watermark, no UI frames.`;
+
+  const promptText = parts.length > 0
+    ? `Style reference image provided above. Maintain artistic medium, lighting, color palette and atmosphere from reference image. Scene description: ${resolvedPrompt}`
+    : resolvedPrompt;
+
+  parts.push({ text: promptText });
+
+  try {
+    const { response, modelUsed } = await generateWithFallback(
+      ['gemini-2.5-flash-image'],
+      (model) => ({
+        model,
+        contents: { parts },
+        config: {
+          imageConfig: {
+            aspectRatio: '16:9',
+          },
+        },
+      }),
+      true
+    );
+
+    let rawImageBase64: string | null = null;
+    const resParts = response.candidates?.[0]?.content?.parts || [];
+    for (const p of resParts) {
+      if (p.inlineData?.data) {
+        rawImageBase64 = p.inlineData.data;
+        break;
+      }
+    }
+
+    if (!rawImageBase64) {
+      throw new Error('No image returned from Gemini');
+    }
+
+    const inputBuffer = Buffer.from(rawImageBase64, 'base64');
+    const webpBuffer = await sharp(inputBuffer)
+      .resize({ width: 1600, withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toBuffer();
+
+    const scenesDir = path.resolve(__dirname, 'public', 'scenes');
+    if (!fs.existsSync(scenesDir)) {
+      fs.mkdirSync(scenesDir, { recursive: true });
+    }
+
+    const targetFile = path.resolve(scenesDir, `${sceneId}.webp`);
+    fs.writeFileSync(targetFile, webpBuffer);
+
+    const { version, totalReady } = updateManifestWithScene(sceneId);
+
+    return res.json({
+      success: true,
+      sceneId,
+      version,
+      url: `/scenes/${sceneId}.webp?v=${version}`,
+      modelUsed,
+      totalReady,
+    });
+  } catch (error: any) {
+    console.error(`[Dev Scene Art Error] ${sceneId}:`, error?.message || error);
+
+    const isAuthError =
+      error?.status === 401 ||
+      error?.status === 403 ||
+      error?.code === 401 ||
+      error?.code === 403 ||
+      String(error?.message || '').includes('API_KEY') ||
+      String(error?.message || '').includes('UNAUTHENTICATED') ||
+      String(error?.message || '').includes('PERMISSION_DENIED');
+
+    if (isAuthError) {
+      return res.status(401).json({
+        error: 'AUTH_ERROR',
+        reason: 'auth_failed',
+        message: 'Нет рабочего ключа Gemini',
+      });
+    }
+
+    const isQuotaExceeded =
+      error?.status === 429 ||
+      error?.code === 429 ||
+      String(error?.message || '').includes('429') ||
+      String(error?.message || '').includes('RESOURCE_EXHAUSTED') ||
+      String(error?.message || '').toLowerCase().includes('quota');
+
+    if (isQuotaExceeded) {
+      return res.status(429).json({
+        error: 'RESOURCE_EXHAUSTED',
+        reason: 'quota',
+        message: 'Превышена квота запросов Gemini API',
+      });
+    }
+
+    return res.status(500).json({
+      error: 'GENERATION_FAILED',
+      message: error?.message || 'Failed to generate scene art',
+    });
+  }
+});
+
+// Dev Studio: Manual Scene Art upload endpoint
+app.post('/api/dev/scene-art/upload', async (req, res) => {
+  const isDevArt = process.env.DEV_ART === '1' || process.env.NODE_ENV !== 'production';
+  if (!isDevArt) {
+    return res.status(403).json({ error: 'Dev art upload disabled in production' });
+  }
+
+  const { worldId, sceneId, fileBase64 } = req.body || {};
+
+  if (!sceneId || typeof sceneId !== 'string' || !/^[a-z0-9_]+$/.test(sceneId)) {
+    return res.status(400).json({ error: 'Invalid sceneId: only [a-z0-9_] allowed' });
+  }
+
+  const allKnownScenes = Object.values(KNOWN_WORLD_SCENES).flat();
+  const worldScenes = worldId && KNOWN_WORLD_SCENES[worldId] ? KNOWN_WORLD_SCENES[worldId] : allKnownScenes;
+  if (!worldScenes.includes(sceneId)) {
+    return res.status(400).json({ error: `Scene '${sceneId}' does not exist in world '${worldId || 'any'}'` });
+  }
+
+  if (!fileBase64 || typeof fileBase64 !== 'string') {
+    return res.status(400).json({ error: 'Missing fileBase64 image data' });
+  }
+
+  try {
+    const rawBuffer = Buffer.from(fileBase64.replace(/^data:image\/[a-z0-9.+-]+;base64,/i, ''), 'base64');
+    const webpBuffer = await sharp(rawBuffer)
+      .resize({ width: 1600, withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toBuffer();
+
+    const scenesDir = path.resolve(__dirname, 'public', 'scenes');
+    if (!fs.existsSync(scenesDir)) {
+      fs.mkdirSync(scenesDir, { recursive: true });
+    }
+
+    const targetFile = path.resolve(scenesDir, `${sceneId}.webp`);
+    if (!targetFile.startsWith(scenesDir + path.sep)) {
+      return res.status(400).json({ error: 'Invalid scene target path' });
+    }
+    fs.writeFileSync(targetFile, webpBuffer);
+
+    const { version, totalReady } = updateManifestWithScene(sceneId);
+
+    return res.json({
+      success: true,
+      sceneId,
+      version,
+      url: `/scenes/${sceneId}.webp?v=${version}`,
+      totalReady,
+    });
+  } catch (error: any) {
+    console.error(`[Dev Scene Art Upload Error] ${sceneId}:`, error?.message || error);
+    return res.status(500).json({
+      error: 'UPLOAD_FAILED',
+      message: error?.message || 'Failed to process uploaded image',
+    });
+  }
+});
+
+// Dev Studio: Download zip of all public/scenes files
+app.get('/api/dev/scenes-zip', (_req, res) => {
+  const isDevArt = process.env.DEV_ART === '1' || process.env.NODE_ENV !== 'production';
+  if (!isDevArt) {
+    return res.status(403).json({ error: 'Dev art download disabled in production' });
+  }
+
+  const scenesDir = path.resolve(__dirname, 'public', 'scenes');
+  if (!fs.existsSync(scenesDir)) {
+    fs.mkdirSync(scenesDir, { recursive: true });
+  }
+
+  res.attachment('scenes-archive.zip');
+  const archive = new ZipArchive({ zlib: { level: 9 } });
+
+  archive.on('error', (err: any) => {
+    console.error('[Archive Error]:', err);
+    if (!res.headersSent) {
+      res.status(500).send({ error: err?.message || 'Archive error' });
+    }
+  });
+
+  archive.pipe(res);
+  archive.directory(scenesDir, 'scenes');
+  archive.finalize();
 });
 
 async function startServer() {

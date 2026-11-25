@@ -1,7 +1,7 @@
 import { WorldSeed, AppLanguage } from '../types';
 
 export const HERO_BACKDROP_IMAGE =
-  '/src/assets/images/hero_title_backdrop_1791455420848.webp';
+  '/images/hero_title_backdrop_1791455420848.webp';
 
 export const WORLD_SEEDS_RU: WorldSeed[] = [
   {
@@ -9,7 +9,7 @@ export const WORLD_SEEDS_RU: WorldSeed[] = [
     title: 'Затопленная цитадель Велена',
     subtitle: 'Готическое глубинное фэнтези · Экспедиция за реликвией',
     genre: 'Тёмное мифическое фэнтези',
-    coverImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+    coverImage: '/images/preset_world_eldoria_1791455431121.webp',
     artStyleName: 'Кьяроскуро: чернила и масло гримуара',
     artStylePrompt:
       'Hand-crafted dark fantasy oil and ink illustration, dramatic chiaroscuro torchlight against deep obsidian and verdigris shadows, rich painterly brushwork, classic tabletop RPG book art style, muted gold and emerald accents',
@@ -106,7 +106,7 @@ export const WORLD_SEEDS_RU: WorldSeed[] = [
       sceneVisualDescription:
         'Kaelen Vance and Sera Nyx standing on a wet basalt causeway before towering submerged gothic stone arches rising from a misty underground lake, confronting a giant barnacle-encrusted bronze knight holding a lead ledger book, warm torchlight reflecting on dark water.',
       presentCharacterIds: ['char-kaelen', 'char-sera'],
-      imageUrl: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      imageUrl: '/images/preset_world_eldoria_1791455431121.webp',
       imageResolution: '1K',
       choices: [
         {
@@ -138,7 +138,7 @@ export const WORLD_SEEDS_RU: WorldSeed[] = [
     title: 'Медный заговор Новой Весперы',
     subtitle: 'Часовой нуар-детектив · Промышленный шпионаж',
     genre: 'Викторианский часовой нуар',
-    coverImage: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+    coverImage: '/images/preset_world_neoverse_1791455441242.webp',
     artStyleName: 'Гуашь и тушь газового света',
     artStylePrompt:
       'Hand-crafted painterly gouache and ink illustration, Victorian clockwork cyber-noir aesthetic, rain-slicked cobblestones reflecting warm amber gaslights and slate-blue fog, brass automata and airships, expressive graphic novel concept art',
@@ -220,7 +220,7 @@ export const WORLD_SEEDS_RU: WorldSeed[] = [
       sceneVisualDescription:
         'Julian Sterling in a dark trench coat and Vesper-7 the brass clockwork hound standing on a wet cobblestone train and airship platform at night, warm amber gaslights in the fog, a massive brass airship moored in the background.',
       presentCharacterIds: ['char-corvo', 'char-automaton'],
-      imageUrl: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+      imageUrl: '/images/preset_world_neoverse_1791455441242.webp',
       imageResolution: '1K',
       choices: [
         {
@@ -252,7 +252,7 @@ export const WORLD_SEEDS_RU: WorldSeed[] = [
     title: 'Странствие звёздных островов',
     subtitle: 'Мифическая небесная одиссея · Космическая картография',
     genre: 'Мифическое астральное фэнтези',
-    coverImage: '/src/assets/images/preset_world_astral_1791455452771.webp',
+    coverImage: '/images/preset_world_astral_1791455452771.webp',
     artStyleName: 'Иллюминированный небесный миф',
     artStylePrompt:
       'Hand-crafted mythic fantasy illustration, floating marble ruins tethered by golden chains in an indigo starlit sky, wooden sky-sailing vessels with luminous sails, rich painterly gouache and gold-leaf accents, classic fantasy book illustration',
@@ -334,7 +334,7 @@ export const WORLD_SEEDS_RU: WorldSeed[] = [
       sceneVisualDescription:
         'Captain Lyra Solis and Master Thorne on the wooden deck of a sky-brigantine sailing through an indigo starlit sky toward floating marble ruins tethered by broken golden chains, a lighthouse glowing in the distance.',
       presentCharacterIds: ['char-lyra', 'char-orion'],
-      imageUrl: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      imageUrl: '/images/preset_world_astral_1791455452771.webp',
       imageResolution: '1K',
       choices: [
         {
@@ -369,7 +369,7 @@ export const WORLD_SEEDS_EN: WorldSeed[] = [
     title: 'The Sunken Citadel of Vaelen',
     subtitle: 'Gothic Abyssal Fantasy · Relic Expedition',
     genre: 'Dark Mythic Fantasy',
-    coverImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+    coverImage: '/images/preset_world_eldoria_1791455431121.webp',
     artStyleName: 'Chiaroscuro Oil & Ink Grimoire',
     artStylePrompt:
       'Hand-crafted dark fantasy oil and ink illustration, dramatic chiaroscuro torchlight against deep obsidian and verdigris shadows, rich painterly brushwork, classic tabletop RPG book art style, muted gold and emerald accents',
@@ -466,7 +466,7 @@ export const WORLD_SEEDS_EN: WorldSeed[] = [
       sceneVisualDescription:
         'Kaelen Vance and Sera Nyx standing on a wet basalt causeway before towering submerged gothic stone arches rising from a misty underground lake, confronting a giant barnacle-encrusted bronze knight holding a lead ledger book, warm torchlight reflecting on dark water.',
       presentCharacterIds: ['char-kaelen', 'char-sera'],
-      imageUrl: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      imageUrl: '/images/preset_world_eldoria_1791455431121.webp',
       imageResolution: '1K',
       choices: [
         {
@@ -498,7 +498,7 @@ export const WORLD_SEEDS_EN: WorldSeed[] = [
     title: 'The Brass Conspiracy of New Vespera',
     subtitle: 'Clockwork Noir Mystery · Industrial Espionage',
     genre: 'Victorian Clockwork Noir',
-    coverImage: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+    coverImage: '/images/preset_world_neoverse_1791455441242.webp',
     artStyleName: 'Gouache & Ink Gaslight Noir',
     artStylePrompt:
       'Hand-crafted painterly gouache and ink illustration, Victorian clockwork cyber-noir aesthetic, rain-slicked cobblestones reflecting warm amber gaslights and slate-blue fog, brass automata and airships, expressive graphic novel concept art',
@@ -580,7 +580,7 @@ export const WORLD_SEEDS_EN: WorldSeed[] = [
       sceneVisualDescription:
         'Julian Sterling in a dark trench coat and Vesper-7 the brass clockwork hound standing on a wet cobblestone train and airship platform at night, warm amber gaslights in the fog, a massive brass airship moored in the background.',
       presentCharacterIds: ['char-corvo', 'char-automaton'],
-      imageUrl: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+      imageUrl: '/images/preset_world_neoverse_1791455441242.webp',
       imageResolution: '1K',
       choices: [
         {
@@ -612,7 +612,7 @@ export const WORLD_SEEDS_EN: WorldSeed[] = [
     title: 'Voyage of the Star-Tethered Isles',
     subtitle: 'Mythic Sky-Sailing Odyssey · Cosmic Cartography',
     genre: 'Mythic Astral Fantasy',
-    coverImage: '/src/assets/images/preset_world_astral_1791455452771.webp',
+    coverImage: '/images/preset_world_astral_1791455452771.webp',
     artStyleName: 'Celestial Illuminated Mythos',
     artStylePrompt:
       'Hand-crafted mythic fantasy illustration, floating marble ruins tethered by golden chains in an indigo starlit sky, wooden sky-sailing vessels with luminous sails, rich painterly gouache and gold-leaf accents, classic fantasy book illustration',
@@ -694,7 +694,7 @@ export const WORLD_SEEDS_EN: WorldSeed[] = [
       sceneVisualDescription:
         'Captain Lyra Solis and Master Thorne on the wooden deck of a sky-brigantine sailing through an indigo starlit sky toward floating marble ruins tethered by broken golden chains, a lighthouse glowing in the distance.',
       presentCharacterIds: ['char-lyra', 'char-orion'],
-      imageUrl: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      imageUrl: '/images/preset_world_astral_1791455452771.webp',
       imageResolution: '1K',
       choices: [
         {

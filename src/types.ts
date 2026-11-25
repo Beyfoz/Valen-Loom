@@ -2,6 +2,8 @@ export type ImageResolution = '1K' | '2K' | '4K';
 export type AppLanguage = 'ru' | 'en';
 
 export type OracleModelTier =
+  | 'gemini-2.5-flash'
+  | 'gemini-2.5-flash-lite'
   | 'gemini-3.1-pro-preview'
   | 'gemini-3.5-flash'
   | 'gemini-3.1-flash-lite';

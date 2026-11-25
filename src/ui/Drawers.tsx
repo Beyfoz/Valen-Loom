@@ -27,8 +27,6 @@ import {
   BookMarked,
   HelpCircle,
   Wrench,
-  FolderDown,
-  Loader2,
 } from 'lucide-react';
 import { useGameStore, DrawerType } from '../store/gameStore';
 import { getWorld } from '../worlds';
@@ -38,6 +36,7 @@ import { SoundManager } from './SoundManager';
 import { InventoryView } from './InventoryModal';
 import { ChoiceBadgeGuideList } from './ChoiceBadgeGuide';
 import { artQueue } from '../ai/artQueue';
+import { DevSceneStudio } from './DevSceneStudio';
 
 export const Drawers: React.FC = () => {
   const {
@@ -84,17 +83,15 @@ export const Drawers: React.FC = () => {
 
   const currentWorld = getWorld(worldId);
 
+  const isDevModeAllowed =
+    Boolean(import.meta.env.DEV) ||
+    (typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('dev') === '1');
+
   const [oracleInput, setOracleInput] = useState('');
   const [showSettingsBadgeList, setShowSettingsBadgeList] = useState(false);
   const [showDevTools, setShowDevTools] = useState(false);
-  const [isGeneratingAllScenes, setIsGeneratingAllScenes] = useState(false);
-  const [devProgress, setDevProgress] = useState<{
-    current: number;
-    total: number;
-    sceneId: string;
-    status: string;
-  } | null>(null);
-  const devCancelRef = useRef(false);
+  const [confirmAction, setConfirmAction] = useState<'none' | 'restoreBackup' | 'restart'>('none');
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -102,48 +99,35 @@ export const Drawers: React.FC = () => {
   const [isMuted, setIsMuted] = useState(SoundManager.getMuted());
   const [volume, setVolume] = useState(SoundManager.getVolume());
 
-  const handleGenerateAllScenes = async () => {
-    if (isGeneratingAllScenes) return;
-    setIsGeneratingAllScenes(true);
-    devCancelRef.current = false;
-
-    const scenesList = Object.values(currentWorld.scenes);
-    const total = scenesList.length;
-
-    for (let i = 0; i < total; i++) {
-      if (devCancelRef.current) {
-        setDevProgress((p) => (p ? { ...p, status: 'Прервано разработчиком.' } : null));
-        break;
-      }
-
-      const scene = scenesList[i];
-      setDevProgress({
-        current: i + 1,
-        total,
-        sceneId: scene.id,
-        status: `Генерация [${i + 1}/${total}]: ${scene.chapterTitle || scene.location}...`,
-      });
-
-      await artQueue.generateSingleSceneForDev(currentWorld, scene, aiArtQuality);
-    }
-
-    if (!devCancelRef.current) {
-      setDevProgress({
-        current: total,
-        total,
-        sceneId: 'Готово',
-        status: `Все ${total} сцен сохранены в дисковый кэш (.cache/scene_images)!`,
-      });
-    }
-
-    setIsGeneratingAllScenes(false);
-  };
+  useEffect(() => {
+    setConfirmAction('none');
+  }, [activeDrawer, worldId]);
 
   useEffect(() => {
     if (activeDrawer === 'oracle' && chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [oracleMessages, activeDrawer, isOracleLoading]);
+
+  // Esc key closes drawer unless focused on an input element
+  useEffect(() => {
+    if (activeDrawer === 'none') return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        const activeEl = document.activeElement;
+        const isInput =
+          activeEl &&
+          (activeEl.tagName === 'INPUT' ||
+            activeEl.tagName === 'TEXTAREA' ||
+            (activeEl as HTMLElement).isContentEditable);
+        if (!isInput) {
+          closeDrawer();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeDrawer, closeDrawer]);
 
   if (activeDrawer === 'none') return null;
 
@@ -157,6 +141,7 @@ export const Drawers: React.FC = () => {
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -164,13 +149,24 @@ export const Drawers: React.FC = () => {
       const imported = importSaveFromJson(content);
       if (imported) {
         loadStateFromSave(imported);
+      } else {
+        useGameStore.setState((prev) => ({
+          notifications: [
+            ...prev.notifications,
+            {
+              id: `err_import_${Date.now()}`,
+              type: 'damage',
+              text: 'Не удалось импортировать файл сохранения: неверный формат JSON.',
+            },
+          ],
+        }));
       }
     };
     reader.readAsText(file);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed top-16 sm:top-20 bottom-0 left-0 right-0 z-45 flex justify-end bg-black/60 backdrop-blur-sm animate-fadeIn">
       {/* Click outside to close */}
       <div className="flex-1" onClick={closeDrawer} />
 
@@ -400,8 +396,8 @@ export const Drawers: React.FC = () => {
                   onChange={(e) => setModelTier(e.target.value as OracleModelTier)}
                   className="bg-black/60 border border-white/20 rounded-lg text-xs px-2 py-1 text-slate-200 font-mono focus:outline-none focus:border-purple-400"
                 >
-                  <option value="gemini-3.1-flash-lite">Flash-Lite (Быстрый шёпот)</option>
-                  <option value="gemini-3.5-flash">Flash (Сбалансированный)</option>
+                  <option value="gemini-2.5-flash">Flash 2.5 (Сбалансированный)</option>
+                  <option value="gemini-2.5-flash-lite">Flash-Lite (Быстрый шёпот)</option>
                   <option value="gemini-3.1-pro-preview">Pro (Глубокий лор)</option>
                 </select>
               </div>
@@ -526,17 +522,36 @@ export const Drawers: React.FC = () => {
                         {backup.chapterNumber} · {new Date(backup.savedAt).toLocaleString('ru-RU')}
                       </span>
                     </div>
-                    <button
-                      onClick={() => {
-                        if (window.confirm('Восстановить автосохранение, сделанное перед последним откатом?')) {
-                          loadBeforeRollback();
-                          closeDrawer();
-                        }
-                      }}
-                      className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-medium border border-amber-500/40 shrink-0 transition"
-                    >
-                      Загрузить
-                    </button>
+                    {confirmAction === 'restoreBackup' ? (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            loadBeforeRollback();
+                            setConfirmAction('none');
+                            closeDrawer();
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-amber-500 text-black text-xs font-semibold transition cursor-pointer"
+                        >
+                          Подтвердить
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmAction('none')}
+                          className="px-2 py-1.5 rounded-lg bg-white/10 text-slate-300 text-xs transition cursor-pointer"
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmAction('restoreBackup')}
+                        className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-medium border border-amber-500/40 shrink-0 transition cursor-pointer"
+                      >
+                        Загрузить
+                      </button>
+                    )}
                   </div>
                 );
               })()}
@@ -579,18 +594,42 @@ export const Drawers: React.FC = () => {
                   Выбрать другой мир (кампанию)
                 </button>
 
-                <button
-                  onClick={() => {
-                    if (window.confirm('Начать прохождение этого мира заново?')) {
-                      restartWorld();
-                      closeDrawer();
-                    }
-                  }}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-medium transition"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Перезапустить текущую кампанию
-                </button>
+                {confirmAction === 'restart' ? (
+                  <div className="p-2.5 rounded-xl bg-rose-950/35 border border-rose-500/40 space-y-2">
+                    <p className="text-xs text-rose-200 text-center">
+                      Начать прохождение этого мира заново? Текущий прогресс будет стёрт.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          restartWorld();
+                          setConfirmAction('none');
+                          closeDrawer();
+                        }}
+                        className="py-1.5 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition cursor-pointer"
+                      >
+                        Да, начать заново
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmAction('none')}
+                        className="py-1.5 px-3 rounded-lg bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-medium transition cursor-pointer"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAction('restart')}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-medium transition cursor-pointer"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Перезапустить текущую кампанию
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -909,10 +948,10 @@ export const Drawers: React.FC = () => {
                       <Sparkles className="w-4 h-4 text-amber-400" />
                       <div>
                         <div className="text-xs font-heading font-semibold text-[#EDE3CB] uppercase tracking-wider">
-                          ИИ-иллюстрации сцен
+                          Рисовать недостающие кадры в игре, расходует лимит
                         </div>
                         <div className="text-[10px] text-slate-400">
-                          Фоны генерируются под текст сцены
+                          Работает только для сцен без готового файла
                         </div>
                       </div>
                     </div>
@@ -933,122 +972,115 @@ export const Drawers: React.FC = () => {
 
                   {/* Качество: быстро / лучше */}
                   {aiArtEnabled && (
-                    <div className="pt-2 border-t border-[#3A2E1D]/80 flex items-center justify-between text-xs">
-                      <span className="text-slate-300 font-medium">Качество:</span>
-                      <div className="grid grid-cols-2 gap-1.5 font-mono text-xs">
-                        <button
-                          type="button"
-                          onClick={() => setAiArtQuality('fast')}
-                          className={`px-3 py-1 rounded-sm text-center transition-all cursor-pointer ${
-                            aiArtQuality === 'fast'
-                              ? 'bg-amber-500 text-black font-bold shadow'
-                              : 'bg-white/10 hover:bg-white/15 text-slate-300'
-                          }`}
-                        >
-                          Быстро
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAiArtQuality('better')}
-                          className={`px-3 py-1 rounded-sm text-center transition-all cursor-pointer ${
-                            aiArtQuality === 'better'
-                              ? 'bg-amber-500 text-black font-bold shadow'
-                              : 'bg-white/10 hover:bg-white/15 text-slate-300'
-                          }`}
-                        >
-                          Лучше
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Скрытый переключатель разработчика (Requirement 5) */}
-                <div className="border border-white/10 rounded-sm p-3 bg-black/40 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
-                      <Wrench className="w-3.5 h-3.5 text-slate-400" />
-                      Инструменты разработчика
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowDevTools(!showDevTools)}
-                      className="text-[11px] font-mono text-amber-400 hover:text-amber-300 underline cursor-pointer"
-                    >
-                      {showDevTools ? 'Скрыть' : 'Открыть'}
-                    </button>
-                  </div>
-
-                  {showDevTools && (
-                    <div className="pt-2 border-t border-white/10 space-y-3">
-                      <div className="text-[11px] text-slate-300 font-prose">
-                        Пакетная предварительная генерация всех сцен мира «{currentWorld.title}». Все изображения сохраняются в дисковый кэш сервера (.cache/scene_images).
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs font-mono text-slate-400">
-                        <span>Всего сцен:</span>
-                        <span className="text-amber-400 font-bold">
-                          {Object.keys(currentWorld.scenes).length}
-                        </span>
-                      </div>
-
-                      {devProgress && (
-                        <div className="p-2.5 rounded-sm bg-black/60 border border-amber-500/30 space-y-2">
-                          <div className="flex items-center justify-between text-[11px] font-mono">
-                            <span className="text-slate-300">Прогресс:</span>
-                            <span className="text-amber-400 font-bold">
-                              {devProgress.current} из {devProgress.total}
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                            <div
-                              className="bg-amber-500 h-full transition-all duration-300"
-                              style={{
-                                width: `${Math.round((devProgress.current / devProgress.total) * 100)}%`,
-                              }}
-                            />
-                          </div>
-                          <div className="text-[10px] font-mono text-slate-400 truncate">
-                            {devProgress.status}
-                          </div>
+                    <div className="pt-2 border-t border-[#3A2E1D]/80 space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-300 font-medium">Качество:</span>
+                        <div className="grid grid-cols-2 gap-1.5 font-mono text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setAiArtQuality('fast')}
+                            className={`px-3 py-1 rounded-sm text-center transition-all cursor-pointer ${
+                              aiArtQuality === 'fast'
+                                ? 'bg-amber-500 text-black font-bold shadow'
+                                : 'bg-white/10 hover:bg-white/15 text-slate-300'
+                            }`}
+                          >
+                            Быстро
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAiArtQuality('quality')}
+                            className={`px-3 py-1 rounded-sm text-center transition-all cursor-pointer ${
+                              aiArtQuality === 'quality'
+                                ? 'bg-amber-500 text-black font-bold shadow'
+                                : 'bg-white/10 hover:bg-white/15 text-slate-300'
+                            }`}
+                          >
+                            Лучше
+                          </button>
                         </div>
-                      )}
+                      </div>
 
-                      <div className="flex flex-col gap-2">
-                        {!isGeneratingAllScenes ? (
-                          <button
-                            type="button"
-                            onClick={handleGenerateAllScenes}
-                            className="w-full py-2 px-3 rounded-sm bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-mono font-semibold transition flex items-center justify-center gap-2 cursor-pointer"
+                      <div className="pt-2 border-t border-white/10 space-y-2">
+                        <div className="flex items-start justify-between text-[11px] gap-2">
+                          <span className="text-slate-400 font-medium flex-shrink-0">
+                            Последняя ошибка:
+                          </span>
+                          <span
+                            className={`font-mono text-right truncate max-w-[200px] ${
+                              artQueue.getLastErrorReason()
+                                ? 'text-rose-400 font-semibold'
+                                : 'text-slate-400'
+                            }`}
+                            title={artQueue.getLastErrorReason() || 'нет ошибок'}
                           >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            <span>Сгенерировать все кадры мира</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              devCancelRef.current = true;
-                            }}
-                            className="w-full py-2 px-3 rounded-sm bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-300 text-xs font-mono font-semibold transition flex items-center justify-center gap-2 cursor-pointer"
-                          >
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Остановить генерацию</span>
-                          </button>
-                        )}
+                            {artQueue.getLastErrorReason() || 'нет ошибок'}
+                          </span>
+                        </div>
 
-                        <a
-                          href={`/api/scene-art/export-zip/${currentWorld.id}`}
-                          download={`${currentWorld.id}_scenes.zip`}
-                          className="w-full py-1.5 px-3 rounded-sm bg-white/10 hover:bg-white/15 border border-white/10 text-slate-300 text-xs font-mono text-center flex items-center justify-center gap-1.5 transition cursor-pointer"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            artQueue.clearFailedKeys();
+                            const currentScene = currentWorld.scenes[state.currentSceneId];
+                            if (currentScene) {
+                              const expectedWorldId = currentWorld.id;
+                              const expectedSceneId = currentScene.id;
+                              artQueue.invalidateAndRetry(currentWorld, currentScene, aiArtQuality, (url, isStub) => {
+                                const cur = useGameStore.getState();
+                                if (cur.worldId === expectedWorldId && cur.state.currentSceneId === expectedSceneId) {
+                                  useGameStore.setState({
+                                    currentArtUrl: url,
+                                    isArtLoading: Boolean(isStub),
+                                  });
+                                }
+                                if (!isStub && url) {
+                                  useGameStore.getState().addSceneArtToGallery({
+                                    id: `${expectedWorldId}_${expectedSceneId}`,
+                                    worldId: expectedWorldId,
+                                    sceneId: expectedSceneId,
+                                    sceneTitle: currentScene.chapterTitle || currentScene.location,
+                                    location: currentScene.location,
+                                    url,
+                                  });
+                                }
+                              });
+                            }
+                          }}
+                          className="w-full py-1.5 px-3 rounded-sm bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-mono font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          <FolderDown className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Скачать архив кэша (ZIP)</span>
-                        </a>
+                          <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Попробовать снова</span>
+                        </button>
                       </div>
                     </div>
                   )}
                 </div>
+
+                {/* Скрытый переключатель разработчика */}
+                {isDevModeAllowed && (
+                  <div className="border border-[#8A6B3A]/40 rounded-xs p-3 bg-[#0D0B10]/90 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-heading font-semibold text-[#EDE3CB] flex items-center gap-2">
+                        <Wrench className="w-4 h-4 text-[#C9A55C]" />
+                        Режим разработчика
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowDevTools(!showDevTools)}
+                        className="text-xs font-heading text-[#C9A55C] hover:text-[#EFE6CF] underline cursor-pointer"
+                      >
+                        {showDevTools ? 'Скрыть' : 'Открыть'}
+                      </button>
+                    </div>
+
+                    {showDevTools && (
+                      <div className="pt-2.5 border-t border-[#8A6B3A]/30">
+                        <DevSceneStudio currentWorld={currentWorld} />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Extra Modals Triggers (B4, B7) */}

@@ -1,114 +1,161 @@
-import React, { useEffect, useState } from 'react';
-
-interface Layer {
-  id: string;
-  url: string;
-  opacity: number;
-}
+import React, { useState, useEffect, useRef } from 'react';
+import { useGameStore } from '../store/gameStore';
+import { getWorld } from '../worlds';
+import { artQueue, isCircuitBreakerActive } from '../ai/artQueue';
+import { getSceneArtUrl } from '../services/sceneArtManifest';
 
 interface BackgroundCrossfadeProps {
   currentUrl: string;
-  worldTitle: string;
-  isArtLoading: boolean;
+  worldTitle?: string;
+  isArtLoading?: boolean;
   aiArtEnabled?: boolean;
-  artFailedNotice?: boolean;
+  artFailedNotice?: string | null;
 }
+
+const sessionRetriedUrls = new Set<string>();
 
 export const BackgroundCrossfade: React.FC<BackgroundCrossfadeProps> = ({
   currentUrl,
   worldTitle,
   isArtLoading,
-  aiArtEnabled = true,
-  artFailedNotice = false,
+  aiArtEnabled,
+  artFailedNotice,
 }) => {
-  const [layers, setLayers] = useState<Layer[]>(() =>
-    currentUrl ? [{ id: `layer-${Date.now()}`, url: currentUrl, opacity: 1 }] : []
-  );
+  const { worldId, state } = useGameStore();
+  const world = getWorld(worldId);
+  const currentScene = world.scenes[state.currentSceneId];
+
+  const defaultFallback = getSceneArtUrl(currentScene, world);
+  const ultimateFallback =
+    currentScene?.localImage ||
+    world.coverImage ||
+    '/images/preset_world_eldoria_1791455431121.webp';
+
+  const [activeUrl, setActiveUrl] = useState<string>(currentUrl || defaultFallback);
+  const [prevUrl, setPrevUrl] = useState<string | null>(null);
+  const [isCrossfading, setIsCrossfading] = useState<boolean>(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!currentUrl) return;
+    const nextUrl = currentUrl || defaultFallback;
+    if (nextUrl !== activeUrl) {
+      setPrevUrl(activeUrl);
+      setActiveUrl(nextUrl);
+      setIsCrossfading(true);
 
-    setLayers((prev) => {
-      const topLayer = prev[prev.length - 1];
-      if (topLayer && topLayer.url === currentUrl) {
-        return prev;
-      }
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setPrevUrl(null);
+        setIsCrossfading(false);
+        timeoutRef.current = null;
+      }, 600);
+    }
+  }, [currentUrl, defaultFallback]);
 
-      const newId = `layer-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const newLayer: Layer = { id: newId, url: currentUrl, opacity: 0 };
-
-      // Keep previous layer visible while new layer fades in
-      const kept = prev.map((l) => ({ ...l, opacity: 1 }));
-      return [...kept, newLayer];
-    });
-
-    // Animate new layer in on next frame
-    const animTimer = setTimeout(() => {
-      setLayers((prev) =>
-        prev.map((layer, index) => {
-          if (index === prev.length - 1) {
-            return { ...layer, opacity: 1 };
-          }
-          return { ...layer, opacity: 0 };
-        })
-      );
-    }, 30);
-
-    // Clean up older layers after 600ms crossfade completes
-    const cleanupTimer = setTimeout(() => {
-      setLayers((prev) => {
-        if (prev.length <= 1) return prev;
-        return prev.slice(-1);
-      });
-    }, 650);
-
+  useEffect(() => {
     return () => {
-      clearTimeout(animTimer);
-      clearTimeout(cleanupTimer);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
     };
-  }, [currentUrl]);
+  }, []);
+
+  const handleImageError = () => {
+    console.warn('[BackgroundCrossfade] Image load failed:', activeUrl, 'Falling back to local cover.');
+
+    // Remove bad entry from cache
+    if (activeUrl) {
+      artQueue.removeCachedImage(activeUrl);
+    }
+
+    // Choose a different fallback URL to avoid infinite onError loops
+    const nextFallback =
+      activeUrl !== defaultFallback
+        ? defaultFallback
+        : activeUrl !== ultimateFallback
+        ? ultimateFallback
+        : '/images/preset_world_eldoria_1791455431121.webp';
+
+    if (nextFallback !== activeUrl) {
+      setActiveUrl(nextFallback);
+      useGameStore.setState({ currentArtUrl: nextFallback, isArtLoading: false });
+    } else {
+      useGameStore.setState({ isArtLoading: false });
+    }
+
+    // Single retry per session if circuit breaker is not active and AI art is enabled
+    const sceneKey = `${world.id}_${currentScene?.id || 'scene'}`;
+    if (
+      aiArtEnabled &&
+      !isCircuitBreakerActive() &&
+      !sessionRetriedUrls.has(sceneKey) &&
+      currentScene
+    ) {
+      sessionRetriedUrls.add(sceneKey);
+      const targetWorldId = world.id;
+      const targetSceneId = currentScene.id;
+      const { aiArtQuality } = useGameStore.getState();
+      artQueue.requestSceneArt({
+        world,
+        scene: currentScene,
+        aiArtEnabled: true,
+        quality: aiArtQuality,
+        onSuccess: (url, isStub) => {
+          const cur = useGameStore.getState();
+          if (
+            !isStub &&
+            url &&
+            cur.worldId === targetWorldId &&
+            cur.state.currentSceneId === targetSceneId
+          ) {
+            useGameStore.setState({ currentArtUrl: url, isArtLoading: false });
+          }
+        },
+      });
+    }
+  };
 
   return (
-    <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
-      {layers.map((layer) => (
-        <div
-          key={layer.id}
-          className="absolute inset-0 w-full h-full transition-opacity duration-[600ms] ease-in-out"
-          style={{ opacity: layer.opacity }}
-        >
-          <img
-            src={layer.url}
-            alt={worldTitle}
-            decoding="async"
-            className={`w-full h-full object-cover object-center transition-transform duration-700 ${
-              isArtLoading ? 'scale-[1.02] filter blur-[0.5px]' : 'scale-100'
-            }`}
-          />
-        </div>
-      ))}
+    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0 bg-[#0D0B0E]">
+      {/* Previous Layer (Crossfade Out) */}
+      {prevUrl && isCrossfading && (
+        <img
+          key={`prev-${prevUrl}`}
+          src={prevUrl}
+          alt={worldTitle || 'Background'}
+          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-600 ease-in-out opacity-0"
+        />
+      )}
 
-      {/* Non-intrusive generation indicator in corner */}
-      {isArtLoading && aiArtEnabled && (
-        <div
-          className="fixed bottom-24 right-4 sm:bottom-28 sm:right-6 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-amber-500/30 text-xs font-mono text-amber-300/90 shadow-lg pointer-events-none select-none transition-all duration-300 animate-fadeIn"
-          aria-label="Генерация фона сцены"
-        >
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-          </span>
-          <span className="tracking-wide text-[11px] sm:text-xs">рисуется…</span>
+      {/* Active Layer (Crossfade In) */}
+      <img
+        key={`curr-${activeUrl}`}
+        src={activeUrl}
+        alt={worldTitle || 'Background'}
+        onError={handleImageError}
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-600 ease-in-out ${
+          isCrossfading ? 'opacity-100 animate-fadeIn' : 'opacity-100'
+        }`}
+      />
+
+      {/* Subtle Loading Pulse Overlay */}
+      {isArtLoading && (
+        <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px] transition-all duration-300 flex items-center justify-center pointer-events-none">
+          <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-black/75 border border-[#8A6B3A]/60 shadow-xl backdrop-blur-md">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#E8CF8A] animate-ping" />
+            <span className="text-xs font-heading font-medium tracking-wide text-[#EDE3CB]">
+              Сотворение художественного полотна...
+            </span>
+          </div>
         </div>
       )}
 
-      {/* 3-second failure notice if all models failed */}
-      {!isArtLoading && artFailedNotice && aiArtEnabled && (
-        <div
-          className="fixed bottom-24 right-4 sm:bottom-28 sm:right-6 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-950/85 backdrop-blur-md border border-red-500/40 text-xs font-mono text-red-200 shadow-lg pointer-events-none select-none transition-all duration-300 animate-fadeIn"
-          aria-label="Сбой генерации фона"
-        >
-          <span className="w-2 h-2 rounded-full bg-red-500" />
-          <span className="tracking-wide text-[11px] sm:text-xs">кадр не удалось нарисовать</span>
+      {/* Notification badge if generation failed */}
+      {artFailedNotice && !isArtLoading && (
+        <div className="absolute bottom-4 right-4 z-20 pointer-events-none opacity-80">
+          <span className="px-2.5 py-1 rounded bg-black/70 border border-white/10 text-[10px] font-mono text-slate-400">
+            {artFailedNotice}
+          </span>
         </div>
       )}
     </div>

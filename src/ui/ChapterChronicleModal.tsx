@@ -57,28 +57,37 @@ export const ChapterChronicleModal: React.FC<ChapterChronicleModalProps> = ({
     return currentChapter?.id || chapters[0]?.id || '';
   });
 
-  // Modal confirmation dialog for rollback
+  // Modal confirmation dialog for rollback & inline confirmation for backup restore
   const [confirmRollbackChapter, setConfirmRollbackChapter] = useState<ChapterInfo | null>(null);
+  const [confirmRestoreBackup, setConfirmRestoreBackup] = useState(false);
 
   // Check if a backup slot exists
   const backupSlot = useMemo(() => {
     return loadBeforeRollbackSlot(world.id);
   }, [world.id, state.savedAt]);
 
-  // Handle ESC
+  // Handle ESC in capture phase so inner confirmation closes before App.tsx global Esc closes the modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (confirmRollbackChapter) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
           setConfirmRollbackChapter(null);
+        } else if (confirmRestoreBackup) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setConfirmRestoreBackup(false);
         } else {
+          e.preventDefault();
+          e.stopImmediatePropagation();
           onClose();
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, confirmRollbackChapter]);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [onClose, confirmRollbackChapter, confirmRestoreBackup]);
 
   const selectedChapter = useMemo(() => {
     return chapters.find((c) => c.id === selectedChapterId) || chapters[0] || null;
@@ -102,16 +111,22 @@ export const ChapterChronicleModal: React.FC<ChapterChronicleModalProps> = ({
     }
   };
 
-  const handleRestoreBackup = () => {
-    if (window.confirm('Восстановить автосохранение, сделанное перед последним откатом главы?')) {
-      loadBeforeRollback();
-      onClose();
-    }
+  const handleConfirmRestoreBackup = () => {
+    SoundManager.playClick();
+    setConfirmRestoreBackup(false);
+    loadBeforeRollback();
+    onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn select-none">
-      <div className="w-full max-w-4xl h-[90vh] sm:h-[84vh] rounded-2xl bg-[#0D0B0E] border border-[#8A6B3A]/30 flex flex-col shadow-2xl overflow-hidden relative text-[#EFE6CF]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn select-none"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-4xl h-[90vh] sm:h-[84vh] rounded-2xl bg-[#0D0B0E] border border-[#8A6B3A]/30 flex flex-col shadow-2xl overflow-hidden relative text-[#EFE6CF]"
+      >
         {/* Brass corner brackets */}
         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[#C9A55C]/70 pointer-events-none z-20" />
         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[#C9A55C]/70 pointer-events-none z-20" />
@@ -233,12 +248,35 @@ export const ChapterChronicleModal: React.FC<ChapterChronicleModalProps> = ({
                     </span>
                   </div>
                 </div>
-                <button
-                  onClick={handleRestoreBackup}
-                  className="px-2.5 py-1 rounded bg-[#2A2117] hover:bg-[#3D2F20] border border-[#8A6B3A]/40 text-[#C9A55C] text-xs transition shrink-0"
-                >
-                  Восстановить
-                </button>
+                {confirmRestoreBackup ? (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleConfirmRestoreBackup}
+                      className="px-2.5 py-1 rounded bg-[#C9A55C] text-[#0D0B0E] font-semibold text-xs transition cursor-pointer"
+                    >
+                      Подтвердить
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmRestoreBackup(false)}
+                      className="px-2 py-1 rounded bg-white/10 text-[#BAAC93] hover:text-[#EFE6CF] text-xs transition cursor-pointer"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      SoundManager.playClick();
+                      setConfirmRestoreBackup(true);
+                    }}
+                    className="px-2.5 py-1 rounded bg-[#2A2117] hover:bg-[#3D2F20] border border-[#8A6B3A]/40 text-[#C9A55C] text-xs transition shrink-0 cursor-pointer"
+                  >
+                    Восстановить
+                  </button>
+                )}
               </div>
             )}
           </div>

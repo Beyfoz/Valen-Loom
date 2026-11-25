@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, Play, RotateCcw, Heart, Brain, Sparkles, Compass } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
-import { WORLD_LIST, getWorld } from '../worlds';
+import { WORLD_LIST } from '../worlds';
 import { loadSaveSlot } from '../engine/gameEngine';
 import { SoundManager } from './SoundManager';
 
@@ -12,6 +12,7 @@ interface WorldSelectProps {
 
 export const WorldSelect: React.FC<WorldSelectProps> = ({ onClose, isInitialScreen = false }) => {
   const { worldId, selectWorld, restartWorld } = useGameStore();
+  const [confirmRestartWorldId, setConfirmRestartWorldId] = useState<string | null>(null);
 
   const handleSelectWorld = (targetId: string) => {
     SoundManager.playClick();
@@ -19,13 +20,12 @@ export const WorldSelect: React.FC<WorldSelectProps> = ({ onClose, isInitialScre
     if (onClose) onClose();
   };
 
-  const handleRestartWorld = (targetId: string, title: string) => {
+  const handleConfirmRestartWorld = (targetId: string) => {
     SoundManager.playClick();
-    if (window.confirm(`Вы уверены, что хотите начать заново историю в мире «${title}»? Прогресс будет стёрт.`)) {
-      selectWorld(targetId);
-      restartWorld();
-      if (onClose) onClose();
-    }
+    setConfirmRestartWorldId(null);
+    selectWorld(targetId);
+    restartWorld();
+    if (onClose) onClose();
   };
 
   return (
@@ -191,13 +191,41 @@ export const WorldSelect: React.FC<WorldSelectProps> = ({ onClose, isInitialScre
                     </button>
 
                     {hasStarted && (
-                      <button
-                        onClick={() => handleRestartWorld(w.id, w.title)}
-                        className="w-full py-1.5 px-3 rounded-lg text-[11px] text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition flex items-center justify-center gap-1.5"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Начать заново</span>
-                      </button>
+                      confirmRestartWorldId === w.id ? (
+                        <div className="p-2 rounded-lg bg-rose-950/40 border border-rose-500/40 space-y-1.5">
+                          <p className="text-[11px] text-rose-200 text-center">
+                            Стереть прогресс в мире «{w.title}»?
+                          </p>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmRestartWorld(w.id)}
+                              className="py-1 px-2 rounded bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-semibold transition cursor-pointer"
+                            >
+                              Подтвердить
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmRestartWorldId(null)}
+                              className="py-1 px-2 rounded bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] transition cursor-pointer"
+                            >
+                              Отмена
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            SoundManager.playClick();
+                            setConfirmRestartWorldId(w.id);
+                          }}
+                          className="w-full py-1.5 px-3 rounded-lg text-[11px] text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Начать заново</span>
+                        </button>
+                      )
                     )}
                   </div>
                 </div>

@@ -8,28 +8,43 @@ interface ChapterTitleCardProps {
 }
 
 export const ChapterTitleCard: React.FC<ChapterTitleCardProps> = ({ scene, world }) => {
-  const { isChapterStart } = useGameStore();
+  const { isChapterStart, setIsChapterStart } = useGameStore();
   const [isVisible, setIsVisible] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const lastChapterKeyRef = useRef<string | null>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const rawChapterTitle = scene?.chapterTitle || '';
   const chapterGroup = rawChapterTitle ? rawChapterTitle.split(':')[0].trim() : '';
 
   useEffect(() => {
-    if (!rawChapterTitle || !chapterGroup) return;
+    if (!isChapterStart) return;
+
+    if (!rawChapterTitle || !chapterGroup) {
+      setIsChapterStart(false);
+      return;
+    }
 
     const chapterKey = `${world.id}:${chapterGroup}`;
 
-    // If chapterGroup is the same as previous, or not marked as chapter start, NEVER trigger
-    if (lastChapterKeyRef.current === chapterKey || !isChapterStart) {
+    // If chapterGroup is the same as previous, skip card and immediately unblock keyboard shortcuts
+    if (lastChapterKeyRef.current === chapterKey) {
+      setIsChapterStart(false);
       return;
     }
 
     lastChapterKeyRef.current = chapterKey;
     setIsVisible(true);
     setIsFadingOut(false);
-  }, [world.id, chapterGroup, isChapterStart, rawChapterTitle]);
+  }, [world.id, chapterGroup, isChapterStart, rawChapterTitle, setIsChapterStart]);
+
+  useEffect(() => {
+    return () => {
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleDismiss = useCallback((e?: React.MouseEvent | KeyboardEvent) => {
     if (e) {
@@ -38,11 +53,14 @@ export const ChapterTitleCard: React.FC<ChapterTitleCardProps> = ({ scene, world
     }
     if (isFadingOut) return;
     setIsFadingOut(true);
-    setTimeout(() => {
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = setTimeout(() => {
       setIsVisible(false);
       setIsFadingOut(false);
+      setIsChapterStart(false);
+      dismissTimerRef.current = null;
     }, 300);
-  }, [isFadingOut]);
+  }, [isFadingOut, setIsChapterStart]);
 
   // Auto-dismiss chapter card after 3 seconds so it does not block HUD
   useEffect(() => {

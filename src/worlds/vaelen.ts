@@ -6,7 +6,7 @@ export const vaelenWorld: WorldModule = {
   title: 'Затопленная цитадель Велена',
   subtitle: 'Готическое глубинное тёмное фэнтези',
   genre: 'Dark Fantasy / Eldritch Depths',
-  coverImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+  coverImage: '/images/preset_world_eldoria_1791455431121.webp',
   artStyleName: 'Кьяроскуро: чернила и масло гримуара',
   artStylePrompt:
     'masterpiece dark fantasy oil and ink grimoire illustration, heavy chiaroscuro, volumetric gloomy candle and bioluminescent brine glow, intricate gothic filigree, wet black stone, tenebrism, hyperdetailed textures',
@@ -26,7 +26,7 @@ export const vaelenWorld: WorldModule = {
     affiliation: 'Орден Волнолома',
     disposition: 'Protagonist',
     visualDescriptor:
-      'tall scarred inquisitor knight in blackened riveted plate armor with corroded brass pauldrons, ragged damp leather cloak, gripping an iron war-pick',
+      'tall scarred inquisitor knight in blackened riveted plate armor with corroded brass pauldrons, ragged damp leather cloak',
     statusNote: 'Помнит день, когда цитадель ушла под воду. Ищет искупления.',
   },
   initialCompanion: {
@@ -58,7 +58,7 @@ export const vaelenWorld: WorldModule = {
       description: 'Кейлен подчиняет силу Астролябии Короля Приливов и возрождает Цитадель Велена из пучины морской.',
       hint: 'Синхронизируйте рассудок с Астролябией при высоком уровне стойкости разума (Sanity >= 40).',
       endingType: 'victory',
-      cgUrl: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      cgUrl: '/images/preset_world_eldoria_1791455431121.webp',
     },
     {
       id: 'v_ending_dam_break',
@@ -66,7 +66,7 @@ export const vaelenWorld: WorldModule = {
       description: 'Астролябия сокрушена ударом боевого клевца. Дамба рушится, и пучина смывает проклятие вековых теней.',
       hint: 'Выберите сокрушение Астролябии во имя упокоения павших душ.',
       endingType: 'destruction',
-      cgUrl: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      cgUrl: '/images/preset_world_eldoria_1791453485261.webp',
     },
     {
       id: 'v_ending_seal_ward',
@@ -74,7 +74,7 @@ export const vaelenWorld: WorldModule = {
       description: 'Кейлен и Сера объединяют приливный огонь фонаря и соляные глифы, запечатывая бездну навеки.',
       hint: 'Сохраните Приливный Фонарь и созидательный союз с Серой до финала.',
       endingType: 'sacrifice',
-      cgUrl: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      cgUrl: '/images/preset_world_eldoria_1791455431121.webp',
     },
   ],
   chapters: [
@@ -235,7 +235,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_causeway_entrance',
       chapterTitle: 'Глава I: Волнолом Шепчущих Вод',
       location: 'Внешний Волнолом цитадели',
-      localImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      localImage: '/images/preset_world_eldoria_1791455431121.webp',
       visualPrompt:
         'character in black plate armor with a companion woman holding lantern on a gargantuan cyclopean damp stone sea wall, crashing black stormy waves, ruined gothic spires sinking into ocean',
       actionFocus: 'Кейлен и Сера всматриваются в пелену солёного тумана у запечатанных ворот',
@@ -365,7 +365,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_weeping_cloisters',
       chapterTitle: 'Глава I: Шепчущие Галереи',
       location: 'Галереи Шепчущих Сестёр',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'creepy gothic waterlogged cloisters with dripping black water and salt statues holding weeping faces, candle stubs',
       actionFocus: 'Кейлен и Сера медленно ступают по узкой галерее среди плачущих статуй',
@@ -451,7 +451,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_sunken_belltower',
       chapterTitle: 'Глава I: Колокольня Приливного Звона',
       location: 'Затонувшая Колокольня',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'massive submerged bronze cathedral bell hanging in flooded gothic tower, shafts of blue light, green verdigris metal',
       actionFocus: 'Кейлен и Сера осматривают исполинский бронзовый колокол над водной гладью',
@@ -504,7 +504,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_causeway_illuminated',
       chapterTitle: 'Глава I: Лазурный Сполох',
       location: 'Озарённый Волнолом',
-      localImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      localImage: '/images/preset_world_eldoria_1791455431121.webp',
       visualPrompt:
         'magical azure beam of light slicing through sea fog, revealing crouching drowned ghouls in ancient iron scrap on stone ramparts',
       actionFocus: 'Фонарь выжигает приливный морок, обращая чудовищ в бегство',
@@ -545,7 +545,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_parapet_ambush',
       chapterTitle: 'Глава I: Когти из Солёной Пены',
       location: 'Внешний карниз волнолома',
-      localImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      localImage: '/images/preset_world_eldoria_1791455431121.webp',
       visualPrompt:
         'visceral fight on narrow stone ledge, knight clashing weapon against a horrific barnacle encrusted drowned ghoul in splashing waves',
       actionFocus: 'Кейлен наносит сокрушительный удар клевцом по нападающей твари',
@@ -597,7 +597,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_ghoul_nest_loot',
       chapterTitle: 'Глава I: Тлеющие Реликвии',
       location: 'Гнездовище падальщиков',
-      localImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      localImage: '/images/preset_world_eldoria_1791455431121.webp',
       visualPrompt:
         'knight uncovering a silver relic ring from sea debris and dead shells on a stone parapet alcove',
       actionFocus: 'Осмотр сокровищ утонувшего капеллана среди костей и водорослей',
@@ -639,7 +639,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_sluice_antechamber',
       chapterTitle: 'Глава II: Механизмы Утонувших',
       location: 'Шлюзовые катакомбы',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'massive flooded gothic subterranean chamber with enormous rusted iron gears, water pouring from vaulted ceilings, moss and luminescent fungi',
       actionFocus: 'Кейлен и Сера бредут по колено в чёрной воде между циклопическими шестернями',
@@ -716,7 +716,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_coral_catacombs',
       chapterTitle: 'Глава II: Коралловый Лабиринт',
       location: 'Коралловые Катакомбы',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'breathtaking subterranean cavern filled with black and turquoise branching bioluminescent corals, human bones embedded in mineral formations',
       actionFocus: 'Кейлен освещает фонарем светящиеся ветви чёрных кораллов',
@@ -774,7 +774,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_salt_mine_shaft',
       chapterTitle: 'Глава II: Соляная Штольня',
       location: 'Шахта Первородной Соли',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'colossal subterranean crystalline salt cavern, giant cubes of translucent halite shining with azure light, abandoned wooden mining scaffolds',
       actionFocus: 'Кейлен и Сера на деревянных мостках среди циклопических кубов чистой соли',
@@ -821,7 +821,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_abyssal_observatory',
       chapterTitle: 'Глава II: Око Пучины',
       location: 'Глубинная Обсерватория Приливов',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'submerged gothic dome with huge circular glass viewing portal into ocean abyss, giant bioluminescent squids swimming past, bronze astrolabe models',
       actionFocus: 'Сера благоговейно смотрит сквозь циклопический иллюминатор в бездну океана',
@@ -876,7 +876,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_salt_chapel',
       chapterTitle: 'Глава II: Безмолвные Обеты',
       location: 'Часовня Соляных Сестёр',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'ancient drowned chapel altar carved from translucent sea salt, statues of veiled nuns weeping black brine, glowing ritual braziers',
       actionFocus: 'Сера преклоняет колено перед кристаллическим соляным алтарём',
@@ -928,7 +928,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_chapel_blessing',
       chapterTitle: 'Глава II: Кристальная Благодать',
       location: 'Освящённый Алтарь Соли',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'ethereal blue spirit hands rising from salt altar, imbuing the knight armor and sword with luminous protective crystallizations',
       actionFocus: 'Оружие Кейлена покрывается сверкающими соляными кристаллами защиты',
@@ -978,7 +978,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_chapel_memory_vision',
       chapterTitle: 'Глава II: Память Потопа',
       location: 'Океан воспоминаний',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'ghostly memory spectral projection of ancient king in sunken throne holding golden astrolabe amidst rushing tidal cataclysm',
       actionFocus: 'Видение раскрывает тайну слабости Полого Стража у Врат Бездны',
@@ -1008,7 +1008,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_pump_mechanism',
       chapterTitle: 'Глава II: Соляной Рычаг',
       location: 'Опорный насосный узел',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'knight straining all muscle strength against an enormous rusted iron wheel covered in barnacles and sea foam',
       actionFocus: 'Кейлен наваливается на заклинивший рычаг, заставляя поршни двигаться',
@@ -1036,7 +1036,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_scriptorium_entry',
       chapterTitle: 'Глава III: Шепчущий Скрипторий',
       location: 'Затопленный Скрипторий',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'flooded gothic scriptorium with towering stone bookshelves, submerged floating manuscripts, glowing blue brine mold',
       actionFocus: 'Сера перебирает свитки из водорослей и свинцовых пластин',
@@ -1084,7 +1084,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_drowned_scriptorium_depths',
       chapterTitle: 'Глава III: Свинцовый Архив',
       location: 'Нижние Хранилища Скриптория',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'deep submerged vault with rows of sealed lead containers under black water, glowing phosphorescent water plants, diver knight silhouette',
       actionFocus: 'Кейлен ныряет за запечатанным свинцовым тубусом архива',
@@ -1129,7 +1129,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_forgotten_crypt',
       chapterTitle: 'Глава III: Крипта Командора',
       location: 'Забытая Крипта Командора',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'solemn underwater crypt with grand marble effigy of high commander holding an intact runic broadsword, glowing blue algae',
       actionFocus: 'Кейлен салютует мраморному надгробию древнего командора ордена',
@@ -1182,7 +1182,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_scriptorium_codex',
       chapterTitle: 'Глава III: Соляной Кодекс',
       location: 'Центральный аналой Скриптория',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'close up of ancient lead tome with celestial diagrams of three moons and spiraling tidal vectors glowing cyan',
       actionFocus: 'Сера находит схему деактивации защитных чар Короля Приливов',
@@ -1220,7 +1220,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_scriptorium_reliquary',
       chapterTitle: 'Глава III: Сокровищница Архивариуса',
       location: 'Опечатанный Реликварий',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'ornate gothic stone vault door opening, revealing a crystal flask of concentrated astral brine and obsidian daggers',
       actionFocus: 'Кейлен отпирает кованый реликварий Печатью Волнолома',
@@ -1269,7 +1269,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_abyssal_chasm',
       chapterTitle: 'Глава IV: Врата Бездны',
       location: 'Пропасть Чёрных Вод',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'perilous narrow stone bridge crossing a bottomless chasm with whirlpool of black glowing brine beneath, massive arched portal',
       actionFocus: 'Кейлен и Сера подходят к исполинским монументальным Вратам Бездны',
@@ -1281,7 +1281,7 @@ export const vaelenWorld: WorldModule = {
         id: 'cg_hollow_sentinel_reveal',
         title: 'Пробуждение Полого Стража',
         subtitle: 'Древний рыцарь цитадели преграждает путь к трону',
-        url: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+        url: '/images/preset_world_eldoria_1791453485261.webp',
       },
       narrative: [
         'Вы выходите на узкий каменный мост без перил. Под мостом с гулом вращается циклопический водоворот чёрной воды, на дне которого мерцают холодные бледные огни.',
@@ -1359,7 +1359,7 @@ export const vaelenWorld: WorldModule = {
       chapterTitle: 'Глава IV: Сталь против Соли',
       location: 'Мост перед Вратами Бездны',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'epic brutal duel between human knight and monstrous eight-foot armored hollow guardian on stone bridge, sparks flying from clashing weapons',
       actionFocus: 'Яростная схватка: Кейлен блокирует сокрушительный выпад великана',
@@ -1416,7 +1416,7 @@ export const vaelenWorld: WorldModule = {
       chapterTitle: 'Глава IV: Реликвии Против Титана',
       location: 'Мост Врат Бездны',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'knight holding ancient relics standing firm against towering armored guardian surrounded by dark swirling water',
       actionFocus: 'Кейлен решает, какую древнюю силу противопоставить монолиту Стража',
@@ -1443,6 +1443,13 @@ export const vaelenWorld: WorldModule = {
           condition: { hasItem: 'relic-lantern' },
           actionFocusPrompt: 'character opening glowing lantern shutter projecting concentrated turquoise beam right into the hollow guardian visor slit',
         },
+        {
+          id: 'c_relic_direct_clash',
+          text: 'Вступить в прямой бой со Стражем без помощи реликвий',
+          targetSceneId: 'v_sentinel_combat',
+          tag: 'AUDACIOUS',
+          approach: 'Audacious',
+        },
       ],
     },
 
@@ -1452,7 +1459,7 @@ export const vaelenWorld: WorldModule = {
       chapterTitle: 'Глава IV: Свет Истины',
       location: 'Мост Врат Бездны',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'blinding turquoise beam of light from brass lantern penetrating hollow guardian helmet, dark spirits escaping in mist, giant bowing down',
       actionFocus: 'Лазурный луч фонаря сжигает червеобразный морок в сердце Стража',
@@ -1492,7 +1499,7 @@ export const vaelenWorld: WorldModule = {
       chapterTitle: 'Глава IV: Акустический Разлом',
       location: 'Мост Врат Бездны',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'violent sonic shockwaves exploding outward from vibrating obsidian fork, the colossal guardian armor shattering into thousands of crystalline salt shards',
       actionFocus: 'Резонанс камертона взрывает соляной панцирь Полого Стража',
@@ -1528,7 +1535,7 @@ export const vaelenWorld: WorldModule = {
       chapterTitle: 'Глава IV: Цена Памяти',
       location: 'Мост Врат Бездны',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'melancholic scene of knight touching hollow guardian chest, silver glowing soul threads detaching from knight head into the titan armor, sad solemn atmosphere',
       actionFocus: 'Кейлен добровольно отдаёт своё самое драгоценное воспоминание',
@@ -1569,7 +1576,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_inner_sanctum_approach',
       chapterTitle: 'Глава V: Сердце Прилива',
       location: 'Внутренний коридор святилища',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'grand arched hallway with walls of solid water held back by golden forcefields, schools of luminous deep sea fish swimming outside, gilded floor',
       actionFocus: 'Кейлен и Сера идут вдоль прозрачных водных стен, любуясь бездной',
@@ -1595,7 +1602,7 @@ export const vaelenWorld: WorldModule = {
       id: 'v_astrolabe_dais',
       chapterTitle: 'Глава V: Выбор Судеб',
       location: 'Тронный Зал Короля Приливов',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'breathtaking climax chamber with glowing golden astrolabe with concentric rotating rings floating above throne, water droplets hovering in mid air',
       actionFocus: 'Кейлен заносит руку над вращающимися золотыми кольцами Астролябии',
@@ -1607,7 +1614,7 @@ export const vaelenWorld: WorldModule = {
         id: 'cg_astrolabe_climax',
         title: 'Астролябия Короля Приливов',
         subtitle: 'Точка схождения судеб океанического мира',
-        url: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+        url: '/images/preset_world_eldoria_1791453485261.webp',
       },
       narrative: [
         'Золотые кольца Астролябии вращаются в сложном трёхмерном танце, издавая мелодичный хрустальный звон. Капли воды в воздухе застыли неподвижно — гравитация подчинена воле древнего механизма.',
@@ -1654,7 +1661,7 @@ export const vaelenWorld: WorldModule = {
       endingTitle: 'Владыка Застывших Вод (Триумф Власти)',
       endingEpilogue:
         'Эпилог: Цитадель Велена возвысилась над волнами. Новый повелитель приливов диктует волю берегам, но бездна навсегда изменила его сердце.',
-      localImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      localImage: '/images/preset_world_eldoria_1791455431121.webp',
       visualPrompt:
         'triumphant majestic scene of knight wearing glowing crown of solidified water, standing atop the grand throne room, oceans parting around the citadel under a starry sky',
       actionFocus: 'Кейлен Вэнс восседает на Троне Приливов, повелевая океанами всего мира',
@@ -1676,7 +1683,7 @@ export const vaelenWorld: WorldModule = {
       endingTitle: 'Разрушитель Дамбы (Очищение Пучиной)',
       endingEpilogue:
         'Эпилог: Воды поглотили темные залы циклопической твердыни. Души павших обрели мир в бескрайней океанской лазури.',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'dramatic cataclysmic scene of ancient gothic citadel crumbling into roaring massive ocean vortex, knight and companion escaping on boat under lightning',
       actionFocus: 'Золотая Астролябия разлетается на тысячи осколков под сокрушительным ударом',
@@ -1698,7 +1705,7 @@ export const vaelenWorld: WorldModule = {
       endingTitle: 'Печать Вечного Отлива (Истинные Хранители)',
       endingEpilogue:
         'Эпилог: Вечный шторм рассеялся над бастионами волнолома. Древнее зло заперто в глубинах нерушимым замком соляных чар.',
-      localImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      localImage: '/images/preset_world_eldoria_1791455431121.webp',
       visualPrompt:
         'peaceful solemn twilight scene of knight and archivist standing on rebuilt lighthouse bastion overlooking calm quiet ocean with ancient runes glowing on the dam',
       actionFocus: 'Кейлен и Сера смыкают ладони над священным фонарем, запирая глубины',
@@ -1719,7 +1726,7 @@ export const vaelenWorld: WorldModule = {
       endingType: 'defeat_health',
       endingTitle: 'Поглощение Пучиной (Смерть Тела)',
       endingEpilogue: 'Эпилог: Раны оказались фатальны. Тело павшего воина опустилось на илистое дно цитадели.',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'dark somber image of shattered knight armor sinking down into black abyssal water surrounded by glowing bioluminescent deep sea creatures',
       actionFocus: 'Кейлен теряет силы и погружается в холодные объятия приливной тьмы',
@@ -1739,7 +1746,7 @@ export const vaelenWorld: WorldModule = {
       endingType: 'defeat_sanity',
       endingTitle: 'Утопление в Безумии (Крах Разума)',
       endingEpilogue: 'Эпилог: Разум не выдержал приливного давления. Шёпот бездны заменил все мысли и воспоминания.',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'hallucinatory nightmare painting of knight kneeling with hands on helmet screaming as black water eyes and coral branches sprout from stone walls',
       actionFocus: 'Рассудок Кейлена окончательно растворяется в голосах древней пучины',

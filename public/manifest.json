@@ -10,13 +10,13 @@
   "theme_color": "#0B0F17",
   "icons": [
     {
-      "src": "/src/assets/images/preset_world_eldoria_1791455431121.webp",
+      "src": "/images/preset_world_eldoria_1791455431121.webp",
       "sizes": "192x192",
       "type": "image/webp",
       "purpose": "any"
     },
     {
-      "src": "/src/assets/images/preset_world_eldoria_1791455431121.webp",
+      "src": "/images/preset_world_eldoria_1791455431121.webp",
       "sizes": "512x512",
       "type": "image/webp",
       "purpose": "any"

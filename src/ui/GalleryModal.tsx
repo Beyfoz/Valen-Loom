@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Image as ImageIcon, Lock, Sparkles, Eye, Filter } from 'lucide-react';
 import { WorldModule } from '../types';
 import { useGameStore, SceneArtEntry } from '../store/gameStore';
+
+import { hasReadySceneArt, getSceneArtUrl } from '../services/sceneArtManifest';
 
 interface GalleryModalProps {
   world: WorldModule;
@@ -16,6 +18,20 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({ world, unlockedCGs, 
   const [activeTab, setActiveTab] = useState<GalleryTab>('all');
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string; subtitle: string } | null>(null);
 
+  // Close lightbox on Escape before App.tsx global Esc closes the gallery modal
+  useEffect(() => {
+    if (!previewImage) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setPreviewImage(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [previewImage]);
+
   // Collect all potential key CGs from current world
   const allCGs: Array<{ id: string; title: string; subtitle: string; url: string }> = [];
   Object.values(world.scenes).forEach((scene) => {
@@ -24,18 +40,45 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({ world, unlockedCGs, 
     }
   });
 
-  // Filter generated scene frames for current world
-  const worldSceneArts: SceneArtEntry[] = unlockedSceneArts.filter(
-    (art) => art.worldId === world.id || !art.worldId
-  );
+  // Collect ready frames from manifest + any generated frames for current world
+  const readyScenesMap = new Map<string, SceneArtEntry>();
+
+  Object.values(world.scenes).forEach((scene) => {
+    if (hasReadySceneArt(scene.id)) {
+      readyScenesMap.set(scene.id, {
+        id: `${world.id}_${scene.id}`,
+        worldId: world.id,
+        sceneId: scene.id,
+        sceneTitle: scene.chapterTitle || scene.location,
+        location: scene.location,
+        url: getSceneArtUrl(scene, world),
+      });
+    }
+  });
+
+  unlockedSceneArts
+    .filter((art) => art.worldId === world.id || !art.worldId)
+    .forEach((art) => {
+      if (!readyScenesMap.has(art.sceneId)) {
+        readyScenesMap.set(art.sceneId, art);
+      }
+    });
+
+  const worldSceneArts: SceneArtEntry[] = Array.from(readyScenesMap.values());
 
   const unlockedCGCount = allCGs.filter((cg) => unlockedCGs.includes(cg.id)).length;
   const totalCount = allCGs.length + worldSceneArts.length;
   const unlockedTotal = unlockedCGCount + worldSceneArts.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn">
-      <div className="w-full max-w-5xl h-[88vh] rounded-2xl bg-[#0E1321] border border-white/15 flex flex-col shadow-2xl overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-5xl h-[88vh] rounded-2xl bg-[#0E1321] border border-white/15 flex flex-col shadow-2xl overflow-hidden"
+      >
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-white/10 flex flex-wrap items-center justify-between gap-3 bg-black/40">
           <div>
@@ -126,7 +169,7 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({ world, unlockedCGs, 
 
                     <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-xs border border-amber-500/30 text-[10px] font-mono text-amber-300 flex items-center gap-1">
                       <Sparkles className="w-2.5 h-2.5" />
-                      <span>ИИ-кадр</span>
+                      <span>{art.url.startsWith('/scenes/') ? 'Кадр сцены' : 'ИИ-кадр'}</span>
                     </div>
 
                     <div className="absolute bottom-2 left-2 right-2 text-left">

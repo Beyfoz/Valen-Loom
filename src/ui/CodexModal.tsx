@@ -80,6 +80,15 @@ export const CodexModal: React.FC<CodexModalProps> = ({ world, flags, onClose })
     }
   }, [world.id]);
 
+  // Sync when a specific Codex entry is requested externally
+  useEffect(() => {
+    if (selectedCodexEntryId && entries.some((e) => e.id === selectedCodexEntryId)) {
+      setActiveCategory('Все');
+      setSearchQuery('');
+      setSelectedId(selectedCodexEntryId);
+    }
+  }, [selectedCodexEntryId, entries]);
+
   // Total unlocked
   const totalUnlocked = useMemo(() => {
     return entries.filter((e) => isCodexEntryUnlocked(e, state)).length;
@@ -162,11 +171,15 @@ export const CodexModal: React.FC<CodexModalProps> = ({ world, flags, onClose })
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [filteredEntries, selectedEntry, selectedId, flags, markCodexEntryRead, onClose]);
+  }, [filteredEntries, selectedEntry, selectedId, state, markCodexEntryRead, onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn select-none">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn select-none"
+      onClick={onClose}
+    >
       <div
+        onClick={(e) => e.stopPropagation()}
         className="w-full max-w-4xl h-[92vh] sm:h-[86vh] rounded-2xl bg-[#0F0C14] border border-[#8A6B3A]/60 flex flex-col shadow-2xl overflow-hidden relative text-left"
         style={{
           boxShadow: 'inset 0 0 0 1px #3A2E1D, 0 24px 64px rgba(0, 0, 0, 0.95)',
@@ -398,7 +411,6 @@ export const CodexModal: React.FC<CodexModalProps> = ({ world, flags, onClose })
                   {/* Lore Stamp */}
                   <div className="pt-4 border-t border-[#3A2E1D]/60 flex items-center justify-between text-[11px] font-heading text-[#8A7E6C]">
                     <span>Летопись: {world.title}</span>
-                    <span>Ключ: #{selectedEntry.unlockFlag}</span>
                   </div>
                 </div>
               ) : (

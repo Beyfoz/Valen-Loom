@@ -107,8 +107,10 @@ export function applyStoryPack(baseWorld: WorldModule, pack: StoryPack): WorldMo
   }
 
   // 5. Merge codex if provided
-  let codex = baseWorld.codex ? [...baseWorld.codex] : [];
-  if (pack.codex) {
+  let codex: CodexEntry[] | undefined =
+    baseWorld.codex && baseWorld.codex.length > 0 ? [...baseWorld.codex] : undefined;
+  if (pack.codex && pack.codex.length > 0) {
+    codex = codex || [];
     for (const entry of pack.codex) {
       const idx = codex.findIndex((e) => e.id === entry.id);
       if (idx >= 0) {

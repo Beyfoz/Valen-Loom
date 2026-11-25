@@ -1,13 +1,19 @@
 import { WorldModule, SceneNode, SceneChoice } from '../types';
+import { hasReadySceneArt, getSceneArtUrl } from '../services/sceneArtManifest';
 
-// ==========================================
-// IndexedDB STORAGE FOR GENERATED SCENE FRAMES
-// ==========================================
+export interface ArtGenerationJob {
+  world: WorldModule;
+  scene: SceneNode;
+  choice?: SceneChoice;
+  quality?: 'fast' | 'quality';
+  aiArtEnabled?: boolean;
+  onSuccess: (imageUrl: string, isStub?: boolean) => void;
+  onError: () => void;
+}
 
 const DB_NAME = 'vaelen_scene_art_db';
 const DB_VERSION = 1;
-const STORE_NAME = 'scene_frames';
-const CLIENT_TIMEOUT_MS = 60000; // 60 seconds
+const STORE_NAME = 'scenes';
 
 class SceneArtIDB {
   private dbPromise: Promise<IDBDatabase | null> | null = null;
@@ -43,7 +49,7 @@ class SceneArtIDB {
           const tx = db.transaction(STORE_NAME, 'readonly');
           const store = tx.objectStore(STORE_NAME);
           const req = store.get(key);
-          req.onsuccess = () => resolve(req.result?.imageUrl || null);
+          req.onsuccess = () => resolve(req.result?.url || null);
           req.onerror = () => resolve(null);
         } catch {
           resolve(null);
@@ -54,465 +60,433 @@ class SceneArtIDB {
     }
   }
 
-  async set(key: string, imageUrl: string, extra?: Record<string, any>): Promise<void> {
+  async set(key: string, url: string): Promise<void> {
     try {
       const db = await this.getDB();
       if (!db) return;
-      return new Promise((resolve) => {
-        try {
-          const tx = db.transaction(STORE_NAME, 'readwrite');
-          const store = tx.objectStore(STORE_NAME);
-          store.put({ key, imageUrl, timestamp: Date.now(), ...(extra || {}) });
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => resolve();
-        } catch {
-          resolve();
-        }
-      });
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.put({ key, url, updatedAt: Date.now() });
+    } catch {}
+  }
+
+  async delete(key: string): Promise<void> {
+    try {
+      const db = await this.getDB();
+      if (!db) return;
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.delete(key);
     } catch {}
   }
 }
 
-// ==========================================
-// CHARACTER VISUAL DESCRIPTOR RESOLVER
-// ==========================================
+const idb = new SceneArtIDB();
+const memoryCache = new Map<string, string>();
 
-export function resolveSpeakerVisual(
+// --- Circuit Breaker (5 min pause after 2 consecutive 429/503 errors, stored in sessionStorage) ---
+const CIRCUIT_BREAKER_UNTIL_KEY = 'vaelen_circuit_breaker_until';
+const CONSECUTIVE_ERRORS_KEY = 'vaelen_consecutive_errors';
+const LAST_ERROR_REASON_KEY = 'vaelen_art_last_error';
+const FAILED_KEYS_KEY = 'vaelen_art_failed_keys';
+
+export function isCircuitBreakerActive(): boolean {
+  try {
+    const until = sessionStorage.getItem(CIRCUIT_BREAKER_UNTIL_KEY);
+    if (!until) return false;
+    const untilMs = Number(until);
+    if (Date.now() < untilMs) {
+      return true;
+    }
+    sessionStorage.removeItem(CIRCUIT_BREAKER_UNTIL_KEY);
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function recordApiError(reasonOrStatus: number | string): void {
+  try {
+    const text = String(reasonOrStatus);
+    const isQuotaOrServer =
+      reasonOrStatus === 429 ||
+      reasonOrStatus === 503 ||
+      text.includes('429') ||
+      text.includes('503') ||
+      text.includes('quota') ||
+      text.includes('RESOURCE_EXHAUSTED');
+
+    if (isQuotaOrServer) {
+      const count = Number(sessionStorage.getItem(CONSECUTIVE_ERRORS_KEY) || '0') + 1;
+      sessionStorage.setItem(CONSECUTIVE_ERRORS_KEY, String(count));
+      if (count >= 2) {
+        const pauseUntil = Date.now() + 5 * 60 * 1000; // 5 min
+        sessionStorage.setItem(CIRCUIT_BREAKER_UNTIL_KEY, String(pauseUntil));
+        console.warn('[ArtQueue] Circuit Breaker: 2 ошибки подряд. Пауза ИИ-запросов на 5 минут.');
+      }
+    }
+    setLastErrorReason(text || 'Ошибка API');
+  } catch {}
+}
+
+export function recordApiSuccess(): void {
+  try {
+    sessionStorage.setItem(CONSECUTIVE_ERRORS_KEY, '0');
+  } catch {}
+}
+
+export function resetCircuitBreaker(): void {
+  try {
+    sessionStorage.removeItem(CIRCUIT_BREAKER_UNTIL_KEY);
+    sessionStorage.setItem(CONSECUTIVE_ERRORS_KEY, '0');
+  } catch {}
+}
+
+export function getLastErrorReason(): string | null {
+  try {
+    return sessionStorage.getItem(LAST_ERROR_REASON_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setLastErrorReason(reason: string | null): void {
+  try {
+    if (reason) {
+      sessionStorage.setItem(LAST_ERROR_REASON_KEY, reason);
+    } else {
+      sessionStorage.removeItem(LAST_ERROR_REASON_KEY);
+    }
+  } catch {}
+}
+
+// --- Failed Keys with 10 min cooldown in localStorage ---
+interface FailedKeyEntry {
+  timestamp: number;
+  reason?: string;
+}
+
+function getFailedKeys(): Record<string, FailedKeyEntry> {
+  try {
+    const raw = localStorage.getItem(FAILED_KEYS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function isKeyFailed(key: string): boolean {
+  const map = getFailedKeys();
+  const entry = map[key];
+  if (!entry) return false;
+  if (Date.now() - entry.timestamp < 10 * 60 * 1000) {
+    return true;
+  }
+  return false;
+}
+
+export function markKeyFailed(key: string, reason = 'error'): void {
+  try {
+    const map = getFailedKeys();
+    map[key] = { timestamp: Date.now(), reason };
+    localStorage.setItem(FAILED_KEYS_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+export function clearFailedKeys(): void {
+  try {
+    localStorage.removeItem(FAILED_KEYS_KEY);
+    resetCircuitBreaker();
+    setLastErrorReason(null);
+  } catch {}
+}
+
+export function buildActionPrompt(
   world: WorldModule,
-  speaker?: { name: string; emotion?: string; avatarUrl?: string }
-): { name: string; visualDescriptor: string } | null {
-  if (!speaker?.name) return null;
-  const name = speaker.name.trim();
+  scene: SceneNode,
+  choice?: SceneChoice
+): string {
+  const worldStyle = world.artStylePrompt;
+  const actionFocus =
+    choice?.actionFocusPrompt ||
+    scene.actionFocus ||
+    choice?.text ||
+    scene.chapterTitle;
 
-  // 1. Check protagonist
-  if (
-    world.protagonist.name.toLowerCase().includes(name.toLowerCase()) ||
-    name.toLowerCase().includes(world.protagonist.name.toLowerCase())
-  ) {
-    return {
-      name: world.protagonist.name,
-      visualDescriptor: world.protagonist.visualDescriptor,
-    };
-  }
+  const characters = `${world.protagonist.name} (${world.protagonist.visualDescriptor}), ${world.initialCompanion.name} (${world.initialCompanion.visualDescriptor})`;
 
-  // 2. Check companion
-  if (
-    world.initialCompanion.name.toLowerCase().includes(name.toLowerCase()) ||
-    name.toLowerCase().includes(world.initialCompanion.name.toLowerCase())
-  ) {
-    return {
-      name: world.initialCompanion.name,
-      visualDescriptor: world.initialCompanion.visualDescriptor,
-    };
-  }
-
-  // 3. Known campaign NPC visual bible
-  const npcMap: Record<string, string> = {
-    'Привратник Ойвин':
-      'ancient stooped monk keeper with massive iron keys on a chain, weathered grey cowl',
-    'Мара':
-      'young anxious salt-diver girl with leather diving goggles pushed onto forehead, brine-soaked vest',
-    'Соляной Ростовщик':
-      'shrewd elderly moneylender in velvet and tarnished silver scales, inspecting brine tokens',
-    'Мать Изольда':
-      'austere high priestess in ceremonial coral vestments with tidal silk veil',
-    'Полый Страж':
-      'towering rusted plate armor encrusted with barnacles and drowned kelp, eerie hollow visor',
-    'Прима Мелиор Ксайн':
-      'haughty imperial inquisitor in obsidian cuirass and embroidered dark velvet mantle',
-    'Король Ауреан III':
-      'tragic spectral drowned monarch in crumbling coral crown and decaying golden royal shroud',
-    'Матушка Лотос':
-      'wise elderly tea-master in embroidered cloud-silk robes with steaming jade teapot',
-    'Адмирал Вор':
-      'stern veteran sky admiral in ornate gold-braided brass-buttoned navy uniform',
-    'Фаэль Хутто':
-      'eccentric goblin-like sky merchant in patchwork leather jacket and magnifying spectacles',
-    'Вивьен': world.initialCompanion.visualDescriptor,
-    'Вивьен Кроу': world.initialCompanion.visualDescriptor,
-    'Лира': world.protagonist.visualDescriptor,
-    'Орион': world.initialCompanion.visualDescriptor,
-    'Кейлен': world.protagonist.visualDescriptor,
-    'Сера': world.initialCompanion.visualDescriptor,
-    'Джулиан': world.protagonist.visualDescriptor,
-  };
-
-  const desc = npcMap[name] || `distinctive local character named ${name} in world-appropriate attire`;
-  return { name, visualDescriptor: desc };
-}
-
-// ==========================================
-// ART QUEUE MANAGER
-// ==========================================
-
-export interface ArtGenerationJob {
-  world: WorldModule;
-  scene: SceneNode;
-  choice?: SceneChoice;
-  aiArtEnabled?: boolean;
-  quality?: 'fast' | 'better';
-  forceRefresh?: boolean;
-  onSuccess: (imageUrl: string, isStub: boolean) => void;
-  onError?: (reason?: string) => void;
-  isPreload?: boolean;
-}
-
-interface InternalTask {
-  job: ArtGenerationJob;
-  cacheKey: string;
-}
-
-function formatErrorReasonRu(status?: number, rawMsg?: string): string {
-  const msg = String(rawMsg || '').toLowerCase();
-  if (status === 429 || msg.includes('429') || msg.includes('quota') || msg.includes('resource_exhausted')) {
-    return 'Квота моделей генерации исчерпана (429 Resource Exhausted)';
-  }
-  if (status === 503 || msg.includes('503') || msg.includes('unavailable')) {
-    return 'Сервис Gemini временно недоступен (503 Service Unavailable)';
-  }
-  if (status === 400 || msg.includes('invalid') || msg.includes('api_key')) {
-    return 'Некорректный запрос или отсутствует ключ API';
-  }
-  if (msg.includes('abort') || msg.includes('timeout')) {
-    return 'Таймаут ожидания ответа модели (60 с)';
-  }
-  return rawMsg ? `Ошибка API (${status || 'сеть'}): ${rawMsg.slice(0, 80)}` : 'Сбой связи с сервером генерации';
+  return `${worldStyle}. Focus on immediate cinematic action: ${actionFocus}. Present heroes: ${characters}. Location: ${scene.location}. High atmospheric clarity, dramatic lighting, no text, no borders.`;
 }
 
 class ArtQueueManager {
-  private idb = new SceneArtIDB();
-  private memoryCache = new Map<string, string>();
-  private activeJobs = new Map<string, ArtGenerationJob>();
-  private pendingQueue: InternalTask[] = [];
+  private queue: ArtGenerationJob[] = [];
   private isProcessing = false;
-  private preloadActiveCount = 0;
-  private failedKeys = new Set<string>();
-  private lastError: string | null = null;
 
-  public getLastError(): string | null {
-    return this.lastError;
+  public getLastErrorReason(): string | null {
+    return getLastErrorReason();
   }
 
-  public resetFailedKeys(): void {
-    this.failedKeys.clear();
-    this.lastError = null;
+  public clearFailedKeys(): void {
+    clearFailedKeys();
   }
 
-  public getCachedUrl(worldId: string, sceneId: string): string | null {
-    const key = `${worldId}_${sceneId}`;
-    return this.memoryCache.get(key) || null;
+  public removeCachedImage(urlOrKey: string): void {
+    for (const [k, v] of memoryCache.entries()) {
+      if (v === urlOrKey || k === urlOrKey) {
+        memoryCache.delete(k);
+        idb.delete(k);
+      }
+    }
   }
 
-  /**
-   * Request background illustration for a scene.
-   * If cached (memory, IDB, disk), immediately returns the final image.
-   * If not cached, instantly provides localImage or coverImage as a stub,
-   * then generates in background and calls onSuccess when ready.
-   */
-  public requestSceneArt(job: ArtGenerationJob): void {
-    const { world, scene, aiArtEnabled = true, forceRefresh = false } = job;
-    const stubUrl = scene.localImage || world.coverImage;
+  public requestSceneArt({
+    world,
+    scene,
+    choice,
+    aiArtEnabled = false,
+    quality = 'fast',
+    onSuccess,
+    onError,
+  }: {
+    world: WorldModule;
+    scene: SceneNode;
+    choice?: SceneChoice;
+    aiArtEnabled?: boolean;
+    quality?: 'fast' | 'quality';
+    onSuccess: (url: string, isStub?: boolean) => void;
+    onError?: () => void;
+  }): void {
+    const sceneKey = `${world.id}_${scene.id}`;
+    const fallbackImage = getSceneArtUrl(scene, world);
 
-    // If user disabled AI illustrations in settings, always use stub immediately
-    if (!aiArtEnabled) {
-      job.onSuccess(stubUrl, false);
+    // 0. If ready scene artwork exists in manifest: return immediately, no AI needed!
+    if (hasReadySceneArt(scene.id)) {
+      onSuccess(fallbackImage, false);
       return;
     }
 
-    const cacheKey = `${world.id}_${scene.id}`;
-
-    if (forceRefresh) {
-      this.failedKeys.delete(cacheKey);
-      this.memoryCache.delete(cacheKey);
-      this.activeJobs.delete(cacheKey);
-      job.onSuccess(stubUrl, true);
-      this.activeJobs.set(cacheKey, job);
-      this.pendingQueue.unshift({ job, cacheKey });
-      this.processQueue();
+    // 1. If AI art is turned off or circuit breaker active or key failed in last 10m:
+    if (!aiArtEnabled || isCircuitBreakerActive() || isKeyFailed(sceneKey)) {
+      onSuccess(fallbackImage, false);
       return;
     }
 
-    // 1. In-memory cache hit: instant
-    if (this.memoryCache.has(cacheKey)) {
-      job.onSuccess(this.memoryCache.get(cacheKey)!, false);
+    // 2. Check memory cache
+    if (memoryCache.has(sceneKey)) {
+      onSuccess(memoryCache.get(sceneKey)!, false);
       return;
     }
 
-    // 2. Check IndexedDB in browser
-    this.idb.get(cacheKey).then(async (idbUrl) => {
-      if (idbUrl) {
-        this.memoryCache.set(cacheKey, idbUrl);
-        job.onSuccess(idbUrl, false);
+    // 3. Check IndexedDB
+    idb.get(sceneKey).then((cached) => {
+      if (cached) {
+        memoryCache.set(sceneKey, cached);
+        onSuccess(cached, false);
         return;
       }
 
-      // 3. Check server disk cache
-      try {
-        const checkRes = await fetch(`/api/scene-art/check-cache/${world.id}/${scene.id}`);
-        if (checkRes.ok) {
-          const checkData = await checkRes.json();
-          if (checkData.cached && checkData.imageUrl) {
-            this.memoryCache.set(cacheKey, checkData.imageUrl);
-            this.idb.set(cacheKey, checkData.imageUrl);
-            job.onSuccess(checkData.imageUrl, false);
-            return;
-          }
-        }
-      } catch {}
+      // Show local image as immediate stub while generating
+      onSuccess(fallbackImage, true);
 
-      // 4. Not cached: IMMEDIATELY show stub, then enqueue generation in background
-      job.onSuccess(stubUrl, true);
+      // Deduplicate already queued jobs for the same sceneKey
+      const existingIdx = this.queue.findIndex(
+        (q) => `${q.world.id}_${q.scene.id}` === sceneKey
+      );
+      const newJob: ArtGenerationJob = {
+        world,
+        scene,
+        choice,
+        quality,
+        aiArtEnabled,
+        onSuccess,
+        onError: onError || (() => onSuccess(fallbackImage, false)),
+      };
 
-      // Avoid queuing duplicate generation for the same scene
-      if (this.activeJobs.has(cacheKey) || this.failedKeys.has(cacheKey)) {
-        return;
+      if (existingIdx >= 0) {
+        this.queue[existingIdx] = newJob;
+      } else {
+        this.queue.push(newJob);
       }
 
-      this.activeJobs.set(cacheKey, job);
-      // Prioritize current scene at front of pending queue
-      this.pendingQueue.unshift({ job, cacheKey });
       this.processQueue();
     });
   }
 
-  // Preload scenes connected to current choices (up to 2 concurrent preload requests)
-  public preloadNextScenes(
-    world: WorldModule,
-    currentScene: SceneNode,
-    aiArtEnabled: boolean = true,
-    quality: 'fast' | 'better' = 'fast'
-  ): void {
-    if (!aiArtEnabled || !currentScene.choices || currentScene.choices.length === 0) return;
-
-    for (const choice of currentScene.choices) {
-      const nextScene = world.scenes[choice.targetSceneId];
-      if (!nextScene) continue;
-
-      const cacheKey = `${world.id}_${nextScene.id}`;
-      if (this.memoryCache.has(cacheKey) || this.activeJobs.has(cacheKey) || this.failedKeys.has(cacheKey)) {
-        continue;
-      }
-
-      // Check IDB before scheduling preload
-      this.idb.get(cacheKey).then((cached) => {
-        if (cached) {
-          this.memoryCache.set(cacheKey, cached);
-          return;
-        }
-
-        if (this.preloadActiveCount >= 2) return;
-
-        const preloadJob: ArtGenerationJob = {
-          world,
-          scene: nextScene,
-          choice,
-          aiArtEnabled: true,
-          quality,
-          isPreload: true,
-          onSuccess: (url) => {
-            this.memoryCache.set(cacheKey, url);
-          },
-          onError: () => {},
-        };
-
-        this.activeJobs.set(cacheKey, preloadJob);
-        this.pendingQueue.push({ job: preloadJob, cacheKey });
-        this.processQueue();
-      });
-    }
-  }
-
-  // Serial queue: exactly one generation API call at a time to prevent rate-limiting
-  private async processQueue(): Promise<void> {
-    if (this.isProcessing || this.pendingQueue.length === 0) return;
-
-    this.isProcessing = true;
-    const task = this.pendingQueue.shift()!;
-    const { job, cacheKey } = task;
-
-    if (job.isPreload) {
-      this.preloadActiveCount++;
-    }
-
-    try {
-      const generatedUrl = await this.executeGeneration(job, cacheKey);
-      if (generatedUrl) {
-        this.memoryCache.set(cacheKey, generatedUrl);
-        await this.idb.set(cacheKey, generatedUrl, {
-          sceneTitle: job.scene.chapterTitle || job.scene.location,
-          worldId: job.world.id,
-        });
-        job.onSuccess(generatedUrl, false);
-      } else {
-        const reason = this.lastError || 'Не удалось сгенерировать кадр';
-        job.onError?.(reason);
-      }
-    } catch (err: any) {
-      this.failedKeys.add(cacheKey);
-      const reason = err?.message || this.lastError || 'Не удалось сгенерировать кадр';
-      job.onError?.(reason);
-    } finally {
-      this.activeJobs.delete(cacheKey);
-      if (job.isPreload) {
-        this.preloadActiveCount = Math.max(0, this.preloadActiveCount - 1);
-      }
-      this.isProcessing = false;
-      // Continue next in queue
-      this.processQueue();
-    }
-  }
-
-  // Executes Step 1 (describe) + Step 2 (generate) with 60s timeout and 1 retry on 503/429
-  private async executeGeneration(job: ArtGenerationJob, cacheKey: string): Promise<string | null> {
-    const { world, scene, quality = 'fast' } = job;
-
-    // STEP 1: Describe frame from scene narrative
-    let frameDescription = '';
-    try {
-      const descController = new AbortController();
-      const descTimer = setTimeout(() => descController.abort(), 20000);
-
-      const descRes = await fetch('/api/scene-art/describe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          worldId: world.id,
-          sceneId: scene.id,
-          location: scene.location,
-          narrative: scene.narrative || [],
-          artStylePrompt: world.artStylePrompt,
-        }),
-        signal: descController.signal,
-      });
-      clearTimeout(descTimer);
-
-      if (descRes.ok) {
-        const descData = await descRes.json();
-        frameDescription = descData.visualDescription || '';
-      } else {
-        const errJson = await descRes.json().catch(() => ({}));
-        const reason = errJson.error || `HTTP ${descRes.status}`;
-        console.warn(`[SceneArt] ${scene.id}, describe, ${reason}`);
-      }
-    } catch (descErr: any) {
-      console.warn(`[SceneArt] ${scene.id}, describe, ${descErr?.message || 'timeout/network error'}`);
-    }
-
-    // Если этап describe упал, всё равно запускаем generate, подставив вместо описания visualPrompt сцены плюс её location
-    if (!frameDescription) {
-      frameDescription = scene.visualPrompt
-        ? `${scene.visualPrompt}, ${scene.location || ''}`
-        : `${scene.location || 'cinematic environment'}, authentic to ${world.artStylePrompt.slice(0, 60)}`;
-    }
-
-    // Resolve speaker visual descriptor if activeSpeaker is present
-    const speakerVisual = resolveSpeakerVisual(world, scene.activeSpeaker);
-
-    // STEP 2: Generate illustration with 60s client timeout & 1 retry on 503/429
-    let attempt = 0;
-    let lastStatus: number | undefined;
-    let lastErrSnippet = '';
-
-    while (attempt < 2) {
-      attempt++;
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
-
-        const res = await fetch('/api/scene-art/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            worldId: world.id,
-            sceneId: scene.id,
-            artStylePrompt: world.artStylePrompt,
-            frameDescription,
-            activeSpeaker: speakerVisual,
-            worldCoverImage: world.coverImage,
-            quality,
-            imageSize: quality === 'better' ? '2K' : '1K',
-          }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.imageUrl) {
-            return data.imageUrl;
-          }
-        }
-
-        lastStatus = res.status;
-        const errData = await res.json().catch(() => ({}));
-        lastErrSnippet = errData.error || `HTTP ${res.status}`;
-
-        // Check if temporary 503/429 status code
-        if ((res.status === 503 || res.status === 429) && attempt === 1) {
-          console.warn(`[SceneArt] ${scene.id}, generate, retry 1 on ${res.status}`);
-          await new Promise((r) => setTimeout(r, 800));
-          continue;
-        }
-
-        break;
-      } catch (e: any) {
-        lastErrSnippet = e?.message || 'network error';
-        if (attempt === 1) {
-          console.warn(`[SceneArt] ${scene.id}, generate, retry 1 on error`);
-          await new Promise((r) => setTimeout(r, 800));
-          continue;
-        }
-        break;
-      }
-    }
-
-    const reasonRu = formatErrorReasonRu(lastStatus, lastErrSnippet);
-    console.warn(`[SceneArt] ${scene.id}, generate, ${reasonRu}`);
-    this.lastError = reasonRu;
-    throw new Error(reasonRu);
-  }
-
-  // Developer single scene generation (for batch generator in settings)
-  public async generateSingleSceneForDev(
-    world: WorldModule,
-    scene: SceneNode,
-    quality: 'fast' | 'better' = 'fast'
-  ): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
-    const cacheKey = `${world.id}_${scene.id}`;
-    try {
-      const url = await this.executeGeneration(
-        {
-          world,
-          scene,
-          quality,
-          onSuccess: () => {},
-        },
-        cacheKey
-      );
-      if (url) {
-        this.memoryCache.set(cacheKey, url);
-        await this.idb.set(cacheKey, url, {
-          sceneTitle: scene.chapterTitle || scene.location,
-          worldId: world.id,
-        });
-        return { success: true, imageUrl: url };
-      }
-      return { success: false, error: this.lastError || 'Не удалось получить кадр' };
-    } catch (err: any) {
-      return { success: false, error: err?.message || this.lastError || 'Ошибка генерации' };
-    }
-  }
-
-  // Backward compatibility alias for older calls
-  public requestArt(job: any): void {
+  public requestArt(job: {
+    world: WorldModule;
+    scene: SceneNode;
+    choice?: SceneChoice;
+    onSuccess: (imageUrl: string) => void;
+    onError: () => void;
+  }): void {
     this.requestSceneArt({
       world: job.world,
       scene: job.scene,
       choice: job.choice,
       aiArtEnabled: true,
       onSuccess: (url) => job.onSuccess(url),
-      onError: (reason) => job.onError?.(reason),
+      onError: job.onError,
     });
+  }
+
+  public invalidateAndRetry(
+    world: WorldModule,
+    scene: SceneNode,
+    quality: 'fast' | 'quality',
+    onSuccess: (url: string, isStub?: boolean) => void
+  ): void {
+    clearFailedKeys();
+    resetCircuitBreaker();
+    setLastErrorReason(null);
+    this.requestSceneArt({
+      world,
+      scene,
+      aiArtEnabled: true,
+      quality,
+      onSuccess,
+    });
+  }
+
+  public async generateSingleSceneForDev(
+    world: WorldModule,
+    scene: SceneNode,
+    quality: 'fast' | 'quality' = 'fast'
+  ): Promise<string | null> {
+    return this.executeGeneration({
+      world,
+      scene,
+      quality,
+      aiArtEnabled: true,
+      onSuccess: () => {},
+      onError: () => {},
+    });
+  }
+
+  public async processQueue(): Promise<void> {
+    if (this.isProcessing || this.queue.length === 0) return;
+    if (isCircuitBreakerActive()) {
+      // Clear remaining queue since circuit breaker is active
+      while (this.queue.length > 0) {
+        const item = this.queue.shift();
+        if (item) {
+          item.onSuccess(getSceneArtUrl(item.scene, item.world), false);
+        }
+      }
+      return;
+    }
+
+    this.isProcessing = true;
+    const job = this.queue.shift()!;
+    const sceneKey = `${job.world.id}_${job.scene.id}`;
+    const fallbackUrl = getSceneArtUrl(job.scene, job.world);
+
+    try {
+      const generatedUrl = await this.executeGeneration(job);
+      if (generatedUrl) {
+        recordApiSuccess();
+        memoryCache.set(sceneKey, generatedUrl);
+        await idb.set(sceneKey, generatedUrl);
+        job.onSuccess(generatedUrl, false);
+      } else {
+        job.onSuccess(fallbackUrl, false);
+      }
+    } catch (err: any) {
+      const reason = err?.message || 'generation_error';
+      recordApiError(reason);
+      markKeyFailed(sceneKey, reason);
+      job.onError();
+    } finally {
+      setTimeout(() => {
+        this.isProcessing = false;
+        this.processQueue();
+      }, 2500);
+    }
+  }
+
+  public processNext(): void {
+    this.processQueue();
+  }
+
+  public async executeGeneration(job: ArtGenerationJob): Promise<string | null> {
+    if (isCircuitBreakerActive()) {
+      return null;
+    }
+
+    const sceneKey = `${job.world.id}_${job.scene.id}`;
+    const frameDescription =
+      job.scene.visualPrompt ||
+      `Atmospheric environment of ${job.scene.location}, authentic to ${job.world.artStylePrompt.slice(0, 60)}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
+
+    try {
+      const res = await fetch('/api/scene-art/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artStylePrompt: job.world.artStylePrompt,
+          sceneVisualDescription: frameDescription,
+          playerAction:
+            job.choice?.actionFocusPrompt ||
+            job.choice?.text ||
+            job.scene.actionFocus ||
+            '',
+          location: job.scene.location,
+          chapterTitle: job.scene.chapterTitle,
+          worldCoverImage: job.world.coverImage,
+          presentCharacters: [job.world.protagonist, job.world.initialCompanion],
+          language: 'ru',
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (res.status === 429 || res.status === 503) {
+        recordApiError(res.status);
+        markKeyFailed(sceneKey, `HTTP ${res.status}`);
+        return null;
+      }
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.reason === 'quota' || data.isQuotaFallback === true) {
+          recordApiError('quota');
+          markKeyFailed(sceneKey, 'quota');
+          return null;
+        }
+
+        const finalUrl = data.imageUrl;
+        if (
+          finalUrl &&
+          typeof finalUrl === 'string' &&
+          !finalUrl.startsWith('/api/scene-image/')
+        ) {
+          return finalUrl;
+        }
+        return null;
+      } else {
+        recordApiError(res.status);
+        markKeyFailed(sceneKey, `HTTP ${res.status}`);
+        return null;
+      }
+    } catch (e: any) {
+      clearTimeout(timeout);
+      recordApiError(e?.message || 'fetch_failed');
+      markKeyFailed(sceneKey, 'network_timeout');
+      return null;
+    }
+  }
+
+  // Preload disabled to protect API quota
+  public preloadNextScenes(
+    _world: WorldModule,
+    _currentScene: SceneNode,
+    _aiArtEnabled = false,
+    _quality: 'fast' | 'quality' = 'fast'
+  ): void {
+    // No-op
+    return;
   }
 }
 

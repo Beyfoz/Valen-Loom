@@ -6,7 +6,7 @@ export const vesperaWorld: WorldModule = {
   title: 'Медный заговор Новой Весперы',
   subtitle: 'Стимпанк / викторианский часовой нуар-детектив',
   genre: 'Clockwork Steampunk / Gaslight Noir',
-  coverImage: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+  coverImage: '/images/preset_world_neoverse_1791455441242.webp',
   artStyleName: 'Гуашь и тушь газового света',
   artStylePrompt:
     'masterpiece victorian clockwork steampunk gouache and ink noir illustration, warm amber gaslight cutting through thick rainy soot fog, intricate brass gears and copper pipes, trenchcoats, chiaroscuro reflections on cobblestone puddles, moody film noir cinematography',
@@ -58,7 +58,7 @@ export const vesperaWorld: WorldModule = {
       description: 'Инспектор Стерлинг раскрывает заговор лордов Часовой Ложи. Маятниковое Ядро спасено, закон восстановлен.',
       hint: 'Предъявите улики лордам и передайте шифровку по жандармским проводам Весперы.',
       endingType: 'victory',
-      cgUrl: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+      cgUrl: '/images/preset_world_neoverse_1791455441242.webp',
     },
     {
       id: 'vesp_ending_architect',
@@ -66,7 +66,7 @@ export const vesperaWorld: WorldModule = {
       description: 'Джулиан берёт контроль над Маятниковым Ядром в свои руки, становясь тайным правителем Новой Весперы.',
       hint: 'Синхронизируйте Ядро с собственным ритмом и возьмите рычаги власти единолично.',
       endingType: 'victory',
-      cgUrl: '/src/assets/images/preset_world_neoverse_1791453496951.webp',
+      cgUrl: '/images/preset_world_neoverse_1791453496951.webp',
     },
     {
       id: 'vesp_ending_sabotage',
@@ -74,7 +74,7 @@ export const vesperaWorld: WorldModule = {
       description: 'Маятник замирает. Монополия Ложи разрушена, пар течет свободно по всем кварталам города.',
       hint: 'Опустите аварийный стопор вместе с Вивьен, уничтожив монополию времени.',
       endingType: 'destruction',
-      cgUrl: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+      cgUrl: '/images/preset_world_neoverse_1791455441242.webp',
     },
   ],
   chapters: [
@@ -229,7 +229,7 @@ export const vesperaWorld: WorldModule = {
       id: 'vesp_workshop_scene',
       chapterTitle: 'Глава I: Остывающий Металл',
       location: 'Мастерская Вейна на Бронзовой Улице',
-      localImage: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+      localImage: '/images/preset_world_neoverse_1791455441242.webp',
       visualPrompt:
         'victorian steampunk detective inspecting a crime scene inside a cluttered clockmaker workshop, gas lamps flickering in rain, shattered clocks and brass parts',
       actionFocus: 'Инспектор Джулиан Стерлинг осматривает тело убитого часовщика у верстака',
@@ -277,7 +277,7 @@ export const vesperaWorld: WorldModule = {
       id: 'vesp_corpse_clues',
       chapterTitle: 'Глава I: Почерк Часовой Ложи',
       location: 'Верстак мастера Вейна',
-      localImage: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+      localImage: '/images/preset_world_neoverse_1791455441242.webp',
       visualPrompt:
         'detective discovering a hidden brass cylinder key mechanism inside the hollow heel of clockmaker boot',
       actionFocus: 'Джулиан находит скрытый тайник в каблуке мастера Вейна',
@@ -299,7 +299,7 @@ export const vesperaWorld: WorldModule = {
                 name: 'Акустический свисток Вейна',
                 category: 'Relic',
                 quantity: 1,
-                usable: true,
+                usable: false,
                 description: 'Высокочастотный свисток. Вызывает сбой в гироскопах автоматонов Ложи.',
                 loreNote: 'Настроен на частоту 24 000 Гц, не слышимую человеком.',
               },
@@ -321,7 +321,7 @@ export const vesperaWorld: WorldModule = {
       id: 'vesp_vent_trail',
       chapterTitle: 'Глава I: Вниз по Трубам',
       location: 'Вентиляционная шахта',
-      localImage: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+      localImage: '/images/preset_world_neoverse_1791455441242.webp',
       visualPrompt:
         'detective and woman crawling through steamy brass industrial ducts with hissing valves and copper pipes',
       actionFocus: 'Джулиан и Вивьен пробираются по шипящим вентиляционным коллекторам',
@@ -352,7 +352,7 @@ export const vesperaWorld: WorldModule = {
       id: 'vesp_decoded_telegram',
       chapterTitle: 'Глава I: Тайный Приказ',
       location: 'Телеграфный терминал Вейна',
-      localImage: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+      localImage: '/images/preset_world_neoverse_1791455441242.webp',
       visualPrompt:
         'deciphered paper strip glowing under amber gas lamp with text revealing a conspiracy by Lord Mayor and the Pendulum Lodge',
       actionFocus: 'Джулиан расшифровывает заговор высших сановников Весперы',
@@ -386,7 +386,7 @@ export const vesperaWorld: WorldModule = {
       id: 'vesp_catacombs_entry',
       chapterTitle: 'Глава II: Лабиринт Клапанов',
       location: 'Паровые Катакомбы Новой Весперы',
-      localImage: '/src/assets/images/preset_world_neoverse_1791453496951.webp',
+      localImage: '/images/preset_world_neoverse_1791453496951.webp',
       visualPrompt:
         'vast subterranean steampunk vault with giant copper pipes, hissing steam geysers, catwalks suspended over boiling runoff canals',
       actionFocus: 'Джулиан и Вивьен идут по подвесным мосткам сквозь клубы горячего пара',
@@ -432,7 +432,7 @@ export const vesperaWorld: WorldModule = {
       id: 'vesp_guards_firefight',
       chapterTitle: 'Глава II: Свинец и Пар',
       location: 'Подвесные мостки катакомб',
-      localImage: '/src/assets/images/preset_world_neoverse_1791453496951.webp',
+      localImage: '/images/preset_world_neoverse_1791453496951.webp',
       visualPrompt:
         'gunfight on narrow metal catwalk in steampunk sewer, detective firing heavy steam revolver spitting fire and steam at masked guards',
       actionFocus: 'Джулиан стреляет из револьвера Векслера, сбивая наёмников с мостков',
@@ -480,7 +480,7 @@ export const vesperaWorld: WorldModule = {
       id: 'vesp_steam_valve_puzzle',
       chapterTitle: 'Глава II: Гидравлический Затвор',
       location: 'Магистральный клапанный узел',
-      localImage: '/src/assets/images/preset_world_neoverse_1791453496951.webp',
+      localImage: '/images/preset_world_neoverse_1791453496951.webp',
       visualPrompt:
         'vivienne adjusting brass pressure gauge needles with wrench while detective keeps watch on metal platform',
       actionFocus: 'Вивьен сбрасывает критическое давление в паропроводе',
@@ -532,7 +532,7 @@ export const vesperaWorld: WorldModule = {
       chapterTitle: 'Глава III: Секундант Правосудия',
       location: 'Зал Большого Маятника',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_neoverse_1791453496951.webp',
+      localImage: '/images/preset_world_neoverse_1791453496951.webp',
       visualPrompt:
         'towering ten-foot brass and iron automaton inquisitor with glowing furnace heart, four arms holding giant shears and steam cannon, ticking loudly',
       actionFocus: 'Автоматон-Инквизитор "Секундант" преграждает путь к Маятниковому Ядру',
@@ -580,7 +580,7 @@ export const vesperaWorld: WorldModule = {
       chapterTitle: 'Глава III: Огонь по Бойлеру',
       location: 'Зал Большого Маятника',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_neoverse_1791453496951.webp',
+      localImage: '/images/preset_world_neoverse_1791453496951.webp',
       visualPrompt:
         'dramatic explosion of steam and brass fragments as detective lands critical shot on giant automaton chest furnace',
       actionFocus: 'Точный паровой выстрел детонирует главный манометр Секунданта',
@@ -617,7 +617,7 @@ export const vesperaWorld: WorldModule = {
       chapterTitle: 'Глава III: Петля Времени',
       location: 'Зал Большого Маятника',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_neoverse_1791453496951.webp',
+      localImage: '/images/preset_world_neoverse_1791453496951.webp',
       visualPrompt:
         'surreal clockwork scene where golden time rift fractures around the automaton, gears spinning backwards in glowing ethereal sparks',
       actionFocus: 'Джулиан нажимает кнопку Хронометра, обращая внутренний ход автоматона вспять',
@@ -652,7 +652,7 @@ export const vesperaWorld: WorldModule = {
       chapterTitle: 'Глава III: Акустический Паралич',
       location: 'Зал Большого Маятника',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_neoverse_1791453496951.webp',
+      localImage: '/images/preset_world_neoverse_1791453496951.webp',
       visualPrompt:
         'automaton holding head as internal gyro compass spins violently out of control, steam venting harmlessly from its shoulders',
       actionFocus: 'Вивьен дует в свисток мастера Вейна, дезориентируя машину',
@@ -686,7 +686,7 @@ export const vesperaWorld: WorldModule = {
       chapterTitle: 'Глава III: Сделка с Машиной',
       location: 'Зал Большого Маятника',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_neoverse_1791453496951.webp',
+      localImage: '/images/preset_world_neoverse_1791453496951.webp',
       visualPrompt:
         'detective handing over a brass cylinder blueprint to automaton chest slot, weary compromised expression, gaslight shadows',
       actionFocus: 'Джулиан отдаёт фамильные чертежи ради спасения Вивьен',
@@ -720,7 +720,7 @@ export const vesperaWorld: WorldModule = {
       id: 'vesp_cathedral_dais',
       chapterTitle: 'Глава IV: Сердце Новой Весперы',
       location: 'Пульт Собора Шестерён',
-      localImage: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+      localImage: '/images/preset_world_neoverse_1791455441242.webp',
       visualPrompt:
         'magnificent climax hall overlooking sprawling rainy steampunk city through giant clock face, glowing pulsating copper pendulum core in center',
       actionFocus: 'Джулиан и Вивьен стоят перед пультом Маятникового Ядра',
@@ -772,7 +772,7 @@ export const vesperaWorld: WorldModule = {
       isEnding: true,
       endingType: 'victory',
       endingTitle: 'Разоблачение Часовой Ложи (Торжество Закона)',
-      localImage: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+      localImage: '/images/preset_world_neoverse_1791455441242.webp',
       visualPrompt:
         'triumphant morning scene in steampunk city, detective Julian in trenchcoat walking out of courthouse with companion as corrupt officials are led away in brass handcuffs',
       actionFocus: 'Инспектор Стерлинг представляет улики против коррумпированных лордов',
@@ -792,7 +792,7 @@ export const vesperaWorld: WorldModule = {
       isEnding: true,
       endingType: 'victory',
       endingTitle: 'Новый Архитектор Шестерней (Теневая Власть)',
-      localImage: '/src/assets/images/preset_world_neoverse_1791453496951.webp',
+      localImage: '/images/preset_world_neoverse_1791453496951.webp',
       visualPrompt:
         'dark noir silhouette of detective seated at an opulent brass desk overlooking the nocturnal clockwork city below, glowing pendulum core resting beside his pipe',
       actionFocus: 'Джулиан Стерлинг берёт в руки рычаги абсолютного контроля над городом',
@@ -812,7 +812,7 @@ export const vesperaWorld: WorldModule = {
       isEnding: true,
       endingType: 'destruction',
       endingTitle: 'Остановка Большого Маятника (Рождение Свободы)',
-      localImage: '/src/assets/images/preset_world_neoverse_1791455441242.webp',
+      localImage: '/images/preset_world_neoverse_1791455441242.webp',
       visualPrompt:
         'dramatic celebration in the city streets, people looking up at the stopped giant clocktower with confetti of broken gears in sky, warm festive gaslights',
       actionFocus: 'Главный маятник замирает, освобождая город от тирании монополии',
@@ -832,7 +832,7 @@ export const vesperaWorld: WorldModule = {
       isEnding: true,
       endingType: 'defeat_health',
       endingTitle: 'Забытый в Стоках (Смерть на Мостках)',
-      localImage: '/src/assets/images/preset_world_neoverse_1791453496951.webp',
+      localImage: '/images/preset_world_neoverse_1791453496951.webp',
       visualPrompt:
         'somber noir scene of detective fedora floating in oily puddle beneath a flickering broken gas lamp',
       actionFocus: 'Джулиан оседает на чугунные плиты от смертельных ранений',
@@ -851,7 +851,7 @@ export const vesperaWorld: WorldModule = {
       isEnding: true,
       endingType: 'defeat_sanity',
       endingTitle: 'Часовое Безумие (Крах Разума)',
-      localImage: '/src/assets/images/preset_world_neoverse_1791453496951.webp',
+      localImage: '/images/preset_world_neoverse_1791453496951.webp',
       visualPrompt:
         'hallucinatory victorian sketch of detective gripping temples as gears and clock faces twist violently in his vision',
       actionFocus: 'Разум Джулиана не выдерживает давления бесконечного тиканья часов',

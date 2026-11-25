@@ -6,7 +6,7 @@ export const astralWorld: WorldModule = {
   title: 'Странствие звёздных островов',
   subtitle: 'Мифическая астральная одиссея',
   genre: 'Mythic Astral Odyssey / Floating Isles',
-  coverImage: '/src/assets/images/preset_world_astral_1791455452771.webp',
+  coverImage: '/images/preset_world_astral_1791455452771.webp',
   artStyleName: 'Иллюминированный небесный миф',
   artStylePrompt:
     'masterpiece illuminated celestial myth art, luminous starlight gold leaf filigree, glowing cyan cosmic nebulas, floating celestial archipelagos in violet void, crystalline sailing skiffs, mythological fantasy illustration',
@@ -58,7 +58,7 @@ export const astralWorld: WorldModule = {
       description: 'Маяк зажжён. Золотой луч связывает все парящие острова в единый архипелаг, наступает золотой век мореплавания.',
       hint: 'Зажгите пламя Маяка Первородных при помощи Эфирного Компаса.',
       endingType: 'victory',
-      cgUrl: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      cgUrl: '/images/preset_world_astral_1791455452771.webp',
     },
     {
       id: 'astral_ending_merge',
@@ -66,7 +66,7 @@ export const astralWorld: WorldModule = {
       description: 'Лира и корабль «Алкион» сливаются с чистым звёздным эфиром, становясь вечным созвездием хранителей небес.',
       hint: 'Ступите в чашу Маяка и соедините душу с первородным космическим ветром.',
       endingType: 'victory',
-      cgUrl: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      cgUrl: '/images/preset_world_astral_1791453508871.webp',
     },
     {
       id: 'astral_ending_constellations',
@@ -74,7 +74,7 @@ export const astralWorld: WorldModule = {
       description: 'Взрыв кометного осколка сеет семена новых звёзд, рождая новые парящие континенты и созвездия.',
       hint: 'Пожертвуйте Осколком Кометы, бросив его в центр чаши Маяка.',
       endingType: 'sacrifice',
-      cgUrl: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      cgUrl: '/images/preset_world_astral_1791455452771.webp',
     },
   ],
   chapters: [
@@ -251,7 +251,7 @@ export const astralWorld: WorldModule = {
       id: 'astral_deck_scene',
       chapterTitle: 'Глава I: Паруса из Северного Сияния',
       location: 'Палуба небесного корвета «Алкион»',
-      localImage: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      localImage: '/images/preset_world_astral_1791455452771.webp',
       visualPrompt:
         'magnificent celestial fantasy galleon sailing through violet clouds and floating crystalline islands, sails made of shimmering auroras, captain woman at brass helm',
       actionFocus: 'Капитан Лира Солис сжимает штурвал, ведя корвет к парящему архипелагу',
@@ -295,7 +295,7 @@ export const astralWorld: WorldModule = {
       id: 'astral_whale_graveyard',
       chapterTitle: 'Глава I: Кости Левиафанов',
       location: 'Кладбище Звёздных Китов',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'hauntingly beautiful celestial scene of enormous glowing whale skeleton arching over floating isles amidst nebulae, ship gliding silently beneath',
       actionFocus: '«Алкион» бесшумно скользит сквозь исполинские светящиеся рёбра звёздного кита',
@@ -332,7 +332,7 @@ export const astralWorld: WorldModule = {
       id: 'astral_plasma_dive',
       chapterTitle: 'Глава I: Огненное Скольжение',
       location: 'Плазменный вихрь Алкиона',
-      localImage: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      localImage: '/images/preset_world_astral_1791455452771.webp',
       visualPrompt:
         'thrilling action scene of celestial ship buffeted by solar winds and blazing cosmic fire, crew lashing down rigging against the storm',
       actionFocus: 'Лира удерживает штурвал в кипящем солнечном шторме',
@@ -365,7 +365,7 @@ export const astralWorld: WorldModule = {
       id: 'astral_crystal_salvage',
       chapterTitle: 'Глава I: Слеза Метеора',
       location: 'Остов звёздного кита',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'captain discovering a radiant blue celestial crystal pulsating with pure cosmic light in the heart of an ancient fossil',
       actionFocus: 'Лира извлекает древний Звёздный Резонатор из окаменевшего хрусталя',
@@ -415,7 +415,7 @@ export const astralWorld: WorldModule = {
       id: 'astral_spire_approach',
       chapterTitle: 'Глава II: Остров Селестия',
       location: 'Остров Селестия, Обсерваторный Шпиль',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'breathtaking floating island crowned with ancient white marble observatory spire surrounded by spinning planetary rings and brass mirrors',
       actionFocus: 'Лира и Орион высаживаются на мраморные террасы парящего острова',
@@ -447,6 +447,12 @@ export const astralWorld: WorldModule = {
           approach: 'Audacious',
           condition: { hasItem: 'relic-comet-shard' },
         },
+        {
+          id: 'c_spire_manual_approach',
+          text: 'Осмотреть подножие Шпиля и подняться по внешним ступеням',
+          targetSceneId: 'astral_spire_aligned',
+          approach: 'Investigative',
+        },
       ],
     },
 
@@ -455,7 +461,7 @@ export const astralWorld: WorldModule = {
       id: 'astral_spire_aligned',
       chapterTitle: 'Глава II: Созвездия Истины',
       location: 'Купол Обсерваторного Шпиля',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'vast celestial hologram of the galaxy filling the dome room, glowing blue constellations pointing path through dark nebula vortex',
       actionFocus: 'Голограмма звёздной карты открывает безопасный фарватер к Вратам Эфира',
@@ -490,7 +496,7 @@ export const astralWorld: WorldModule = {
       chapterTitle: 'Глава III: Дракон Созвездий',
       location: 'Врата Эфира',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'epic mythological encounter, immense celestial star dragon leviathan woven from nebulas and starlight coiling around colossal floating crystal arches',
       actionFocus: 'Астральный Левиафан вздымается из глубин туманности перед корветом',
@@ -538,7 +544,7 @@ export const astralWorld: WorldModule = {
       chapterTitle: 'Глава III: Битва в Невесомости',
       location: 'Врата Эфира',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'dramatic space naval battle, ship firing blazing balistas at majestic star leviathan, solar flare explosions illuminating ship deck',
       actionFocus: '«Алкион» ведёт отчаянный огонь, маневрируя между хвостом дракона',
@@ -575,7 +581,7 @@ export const astralWorld: WorldModule = {
       chapterTitle: 'Глава III: Песнь Гармонии',
       location: 'Врата Эфира',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'peaceful majestic cosmic communion, captain with prism singing ethereal light song, star dragon leaning huge head down towards ship softly',
       actionFocus: 'Призма Звёздного Ветра сплетает свет корабля с душой Левиафана',
@@ -610,7 +616,7 @@ export const astralWorld: WorldModule = {
       chapterTitle: 'Глава III: Сверхновая Вспышка',
       location: 'Врата Эфира',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'blinding brilliant flash of gold and blue light from comet shard illuminating the entire astral void as dragon recoils in awe',
       actionFocus: 'Лира раскалывает осколок кометы, ослепляя Левиафана чистым пламенем',
@@ -644,7 +650,7 @@ export const astralWorld: WorldModule = {
       chapterTitle: 'Глава III: Дар Звёздного Света',
       location: 'Врата Эфира',
       isKeyBossEncounter: true,
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'emotional scene of captain standing on ship prow offering glowing starlight from her chest to the majestic cosmic dragon, bittersweet atmosphere',
       actionFocus: 'Лира отдаёт частицу тепла своей души великому стражу',
@@ -678,7 +684,7 @@ export const astralWorld: WorldModule = {
       id: 'astral_beacon_dais',
       chapterTitle: 'Глава IV: Погасший Маяк Первородных',
       location: 'Остров Небесный Предел, Вершина Маяка',
-      localImage: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      localImage: '/images/preset_world_astral_1791455452771.webp',
       visualPrompt:
         'grand mythological climax atop highest floating peak, ancient golden brazier beacon surrounded by empty constellation sockets under infinite starfield',
       actionFocus: 'Лира и Орион стоят у потухшей чаши Первородного Маяка',
@@ -721,7 +727,7 @@ export const astralWorld: WorldModule = {
       isEnding: true,
       endingType: 'victory',
       endingTitle: 'Гавань Первородных Звёзд (Триумф Путешественников)',
-      localImage: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      localImage: '/images/preset_world_astral_1791455452771.webp',
       visualPrompt:
         'breathtaking triumphant sunrise across celestial multiverse, glowing bridge of starlight connecting floating islands, fleets of ships arriving happily',
       actionFocus: 'Золотой столб света Маяка соединяет все парящие острова в единый архипелаг',
@@ -741,7 +747,7 @@ export const astralWorld: WorldModule = {
       isEnding: true,
       endingType: 'victory',
       endingTitle: 'Песнь Левиафанов (Бессмертие в Звёздах)',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'mythic transcendent scene of the ship and captain transformed into shimmering starlight constellation gliding alongside cosmic whales',
       actionFocus: 'Лира и «Алкион» становятся вечным созвездием хранителей',
@@ -761,7 +767,7 @@ export const astralWorld: WorldModule = {
       isEnding: true,
       endingType: 'sacrifice',
       endingTitle: 'Возрождение Созвездий (Новая Эра Мира)',
-      localImage: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      localImage: '/images/preset_world_astral_1791455452771.webp',
       visualPrompt:
         'spectacular cosmic dawn with dozens of new radiant constellations blooming in the night sky like golden lotus flowers over floating islands',
       actionFocus: 'Взрыв кометного осколка засевает пустоту семенами новых звёзд',
@@ -781,7 +787,7 @@ export const astralWorld: WorldModule = {
       isEnding: true,
       endingType: 'defeat_health',
       endingTitle: 'Падение в Бездну (Гибель Корвета)',
-      localImage: '/src/assets/images/preset_world_astral_1791453508871.webp',
+      localImage: '/images/preset_world_astral_1791453508871.webp',
       visualPrompt:
         'tragic somber painting of burning shattered celestial sails falling down into endless purple starless void',
       actionFocus: '«Алкион» с разломанными мачтами медленно погружается во тьму',
@@ -800,7 +806,7 @@ export const astralWorld: WorldModule = {
       isEnding: true,
       endingType: 'defeat_sanity',
       endingTitle: 'Забвение в Пустоте (Крах Разума)',
-      localImage: '/src/assets/images/preset_world_astral_1791455452771.webp',
+      localImage: '/images/preset_world_astral_1791455452771.webp',
       visualPrompt:
         'hallucinatory cosmic artwork of captain drifting with eyes full of cold white stars, fading into pure void',
       actionFocus: 'Разум Лиры растворяется в бесконечной холодности вселенной',

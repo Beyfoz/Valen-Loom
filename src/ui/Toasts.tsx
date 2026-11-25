@@ -18,6 +18,11 @@ export const Toasts: React.FC = () => {
   const [isHovered, setIsHovered] = useState(false);
   const outcomeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Reset hover lock whenever card closes or changes
+  useEffect(() => {
+    setIsHovered(false);
+  }, [outcomeCard?.id]);
+
   // 1. Outcome card timer (6 seconds, paused on hover)
   useEffect(() => {
     if (!outcomeCard) return;
@@ -51,14 +56,14 @@ export const Toasts: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [outcomeCard, dismissOutcomeCard]);
 
-  // 3. Fallback generic notifications timer (e.g. Save loaded, etc.)
+  // 3. Fallback generic notifications timer (pause while outcomeCard is hiding it)
   useEffect(() => {
-    if (notifications.length === 0) return;
+    if (outcomeCard || notifications.length === 0) return;
     const timer = setTimeout(() => {
       dismissNotification(notifications[0].id);
     }, 4000);
     return () => clearTimeout(timer);
-  }, [notifications, dismissNotification]);
+  }, [outcomeCard, notifications, dismissNotification]);
 
   const hasOutcomeCard = !!outcomeCard;
   const singleFallbackNotification = notifications[0];

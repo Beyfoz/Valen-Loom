@@ -28,10 +28,15 @@ import {
   loadBeforeRollbackSlot,
 } from '../engine/gameEngine';
 import { getScenePages, getSceneFullText } from '../engine/pages';
-import { artQueue } from '../ai/artQueue';
+import { artQueue, isCircuitBreakerActive } from '../ai/artQueue';
 import { enrichSceneText, askOracle } from '../ai/geminiClient';
 import { SoundManager } from '../ui/SoundManager';
 import { itemArtService } from '../ui/itemArtService';
+import {
+  getSceneArtUrl,
+  hasReadySceneArt,
+  preloadReadySceneArts,
+} from '../services/sceneArtManifest';
 
 export type DrawerType =
   | 'none'
@@ -41,16 +46,6 @@ export type DrawerType =
   | 'oracle'
   | 'saves'
   | 'settings';
-
-export interface SceneArtEntry {
-  id: string; // `${worldId}_${sceneId}`
-  worldId: string;
-  sceneId: string;
-  sceneTitle: string;
-  location: string;
-  url: string;
-  timestamp: number;
-}
 
 export interface ChoiceOutcomeCardItem {
   id: string;
@@ -85,6 +80,15 @@ export interface SensoryBlockState {
   epilogueNote?: string;
 }
 
+export interface SceneArtEntry {
+  id: string;
+  worldId: string;
+  sceneId: string;
+  sceneTitle: string;
+  location: string;
+  url: string;
+}
+
 interface GameStoreState {
   worldId: string;
   state: GameSaveState;
@@ -98,8 +102,19 @@ interface GameStoreState {
   isEnriching: boolean;
   recentSensoryTexts: string[];
 
+  // AI Art settings and state
+  aiArtEnabled: boolean;
+  setAiArtEnabled: (enabled: boolean) => void;
+  aiArtQuality: 'fast' | 'quality';
+  setAiArtQuality: (quality: 'fast' | 'quality') => void;
+  artFailedNotice: string | null;
+  setArtFailedNotice: (notice: string | null) => void;
+  unlockedSceneArts: SceneArtEntry[];
+  addSceneArtToGallery: (entry: SceneArtEntry) => void;
+
   // Visual Novel presentation state
   dialogueChunkIndex: number;
+  sceneResetCounter: number;
   isTypewriterComplete: boolean;
   currentArtUrl: string;
   isArtLoading: boolean;
@@ -112,13 +127,6 @@ interface GameStoreState {
   hasSeenBadgeHelpPrompt: boolean;
   inventoryViewMode: 'classic' | 'new';
   choiceDisplayMode: 'manual' | 'auto'; // 'manual' = «После нажатия» (default), 'auto' = «Сразу после текста»
-
-  // AI Scene Art Illustration settings & Gallery
-  aiArtEnabled: boolean;
-  aiArtQuality: 'fast' | 'better';
-  lastArtError: string | null;
-  artFailedNotice: boolean;
-  unlockedSceneArts: SceneArtEntry[];
 
   // Rewind (B6)
   rewindState: GameSaveState | null;
@@ -142,6 +150,7 @@ interface GameStoreState {
   showChapterChronicle: boolean;
   inspectedItemDetail: Item | null;
   isChapterStart: boolean;
+  setIsChapterStart: (val: boolean) => void;
 
   // Oracle chat
   oracleMessages: ChatMessage[];
@@ -205,14 +214,12 @@ interface GameStoreState {
   setHasSeenBadgeHelpPrompt: (val: boolean) => void;
   setInventoryViewMode: (mode: 'classic' | 'new') => void;
   setChoiceDisplayMode: (mode: 'manual' | 'auto') => void;
-  setAiArtEnabled: (val: boolean) => void;
-  setAiArtQuality: (val: 'fast' | 'better') => void;
-  retrySceneArt: () => void;
-  addSceneArtToGallery: (entry: Omit<SceneArtEntry, 'timestamp'>) => void;
+  isAnyModalOpen: () => boolean;
 }
 
 // In-memory sensory cache by scene key (A1)
 const inMemorySensoryCache = new Map<string, SensoryBlockState>();
+let screenShakeTimer: ReturnType<typeof setTimeout> | null = null;
 
 function computeStateHash(state: GameSaveState): string {
   const itemIds = state.inventory.map((i) => i.id).sort().join(',');
@@ -275,10 +282,17 @@ const rawInitialSave = loadSaveSlot('vaelen') || createInitialState(initialWorld
 const initialSave = ensureCodexTrackingInitialized('vaelen', rawInitialSave);
 
 // Read localStorage settings
-const storedEnableAtmosphere =
+const storedAiArtEnabled =
   typeof localStorage !== 'undefined'
-    ? localStorage.getItem('vaelen_enable_atmosphere') !== 'false'
-    : true;
+    ? localStorage.getItem('vaelen_ai_art_enabled') === 'true'
+    : false;
+const storedEnableAtmosphere = (() => {
+  if (typeof localStorage === 'undefined') return storedAiArtEnabled;
+  const raw = localStorage.getItem('vaelen_enable_atmosphere');
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return storedAiArtEnabled;
+})();
 const storedTagsLang =
   (typeof localStorage !== 'undefined'
     ? (localStorage.getItem('vaelen_tags_lang') as 'ru' | 'en')
@@ -303,79 +317,24 @@ const storedNotificationVerbosity =
   (typeof localStorage !== 'undefined'
     ? (localStorage.getItem('vaelen_notification_verbosity') as NotificationVerbosity)
     : 'brief') || 'brief';
-
-const storedAiArtEnabled =
-  typeof localStorage !== 'undefined'
-    ? localStorage.getItem('vaelen_ai_art_enabled') !== 'false'
-    : true;
-const storedAiArtQuality =
-  (typeof localStorage !== 'undefined'
-    ? (localStorage.getItem('vaelen_ai_art_quality') as 'fast' | 'better')
-    : 'fast') || 'fast';
-
-let initialGalleryArts: SceneArtEntry[] = [];
-try {
-  if (typeof localStorage !== 'undefined') {
-    const raw = localStorage.getItem('vaelen_gallery_arts');
-    if (raw) initialGalleryArts = JSON.parse(raw);
-  }
-} catch {}
-
-function triggerSceneArtLoad(
-  set: any,
-  get: any,
-  world: WorldModule,
-  scene: SceneNode,
-  choice?: SceneChoice,
-  forceRefresh?: boolean
-) {
-  const { aiArtEnabled, aiArtQuality } = get();
-  set({ isArtLoading: true, artFailedNotice: false });
-  artQueue.requestSceneArt({
-    world,
-    scene,
-    choice,
-    aiArtEnabled,
-    quality: aiArtQuality,
-    forceRefresh,
-    onSuccess: (url, isStub) => {
-      set({
-        currentArtUrl: url,
-        isArtLoading: isStub,
-        artFailedNotice: false,
-        lastArtError: null,
-      });
-      if (!isStub && url) {
-        get().addSceneArtToGallery({
-          id: `${world.id}_${scene.id}`,
-          worldId: world.id,
-          sceneId: scene.id,
-          sceneTitle: scene.chapterTitle || scene.location,
-          location: scene.location,
-          url,
-        });
-      }
-    },
-    onError: (reason?: string) => {
-      set({
-        currentArtUrl: scene?.localImage || world.coverImage,
-        isArtLoading: false,
-        lastArtError: reason || 'Не удалось сгенерировать кадр',
-        artFailedNotice: true,
-      });
-      setTimeout(() => {
-        set({ artFailedNotice: false });
-      }, 3000);
-    },
-  });
-  artQueue.preloadNextScenes(world, scene, aiArtEnabled, aiArtQuality);
-}
+const storedFontSize: 'sm' | 'base' | 'lg' = (() => {
+  if (typeof localStorage === 'undefined') return 'base';
+  const raw = localStorage.getItem('vaelen_font_size');
+  return raw === 'sm' || raw === 'base' || raw === 'lg' ? raw : 'base';
+})();
+const storedTypewriterSpeedMs: number = (() => {
+  if (typeof localStorage === 'undefined') return 20;
+  const raw = localStorage.getItem('vaelen_typewriter_speed_ms');
+  if (raw === null) return 20;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 60 ? parsed : 20;
+})();
 
 export const useGameStore = create<GameStoreState>((set, get) => ({
   worldId: initialSave.worldId,
   state: initialSave,
   activeDrawer: 'none',
-  modelTier: 'gemini-3.5-flash',
+  modelTier: 'gemini-2.5-flash',
 
   enableAtmosphere: storedEnableAtmosphere,
   isSensoryOpen: false,
@@ -383,28 +342,42 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   isEnriching: false,
   recentSensoryTexts: [],
 
+  // AI Art settings and state
+  aiArtEnabled: storedAiArtEnabled,
+  setAiArtEnabled: (aiArtEnabled: boolean) => {
+    try {
+      localStorage.setItem('vaelen_ai_art_enabled', String(aiArtEnabled));
+    } catch {}
+    set({ aiArtEnabled });
+  },
+  aiArtQuality: 'fast',
+  setAiArtQuality: (aiArtQuality: 'fast' | 'quality') => set({ aiArtQuality }),
+  artFailedNotice: null,
+  setArtFailedNotice: (artFailedNotice: string | null) => set({ artFailedNotice }),
+  unlockedSceneArts: [],
+  addSceneArtToGallery: (entry: SceneArtEntry) =>
+    set((s) => ({
+      unlockedSceneArts: [...s.unlockedSceneArts.filter((a) => a.id !== entry.id), entry],
+    })),
+
   dialogueChunkIndex: 0,
+  sceneResetCounter: 0,
   isTypewriterComplete: false,
-  currentArtUrl:
-    initialWorld.scenes[initialSave.currentSceneId]?.localImage ||
-    initialWorld.coverImage,
+  currentArtUrl: getSceneArtUrl(
+    initialWorld.scenes[initialSave.currentSceneId],
+    initialWorld
+  ),
   isArtLoading: false,
   screenShake: false,
   autoPlay: false,
-  typewriterSpeedMs: 20,
-  fontSize: 'base',
+  typewriterSpeedMs: storedTypewriterSpeedMs,
+  fontSize: storedFontSize,
   tagsLanguage: storedTagsLang,
   showChoiceBadgeHints: storedBadgeHints,
   hasSeenBadgeHelpPrompt: storedSeenBadgePrompt,
   inventoryViewMode: storedInventoryViewMode,
   choiceDisplayMode: storedChoiceDisplayMode,
   notificationVerbosity: storedNotificationVerbosity,
-
-  aiArtEnabled: storedAiArtEnabled,
-  aiArtQuality: storedAiArtQuality,
-  lastArtError: null,
-  artFailedNotice: false,
-  unlockedSceneArts: initialGalleryArts,
 
   outcomeCard: null,
   companionToast: null,
@@ -429,6 +402,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   showChapterChronicle: false,
   inspectedItemDetail: null,
   isChapterStart: true,
+  setIsChapterStart: (isChapterStart: boolean) => set({ isChapterStart }),
 
   oracleMessages: [
     {
@@ -436,7 +410,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       role: 'model',
       text:
         'Приветствую, путник. Я — Оракул и Хранитель летописи. Задавайте вопросы о тайнах мира, мотивах фракций или скрытых свойствах найденных реликвий.',
-      modelUsed: 'gemini-3.5-flash',
+      modelUsed: 'gemini-2.5-flash',
       personaName: 'Хранитель Летописи',
       timestamp: 'Начало',
     },
@@ -451,38 +425,54 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const existingSave = ensureCodexTrackingInitialized(newWorldId, rawSave);
     const scene = world.scenes[existingSave.currentSceneId] || world.scenes[world.startSceneId];
 
-    set({
+    if (scene?.choices) {
+      preloadReadySceneArts(scene.choices.map((c) => c.targetSceneId).filter(Boolean));
+    }
+
+    set((s) => ({
       worldId: newWorldId,
       state: existingSave,
       dialogueChunkIndex: 0,
+      sceneResetCounter: s.sceneResetCounter + 1,
       isTypewriterComplete: false,
-      currentArtUrl: scene?.localImage || world.coverImage,
+      currentArtUrl: getSceneArtUrl(scene, world),
+      isArtLoading: false,
       activeDrawer: 'none',
       showWorldSelect: false,
       selectedCodexEntryId: null,
       showCodex: false,
+      showHotspots: false,
+      showBacklog: false,
+      showEndings: false,
+      showGallery: false,
+      showChapterChronicle: false,
+      inspectedItemDetail: null,
+      activeSkillCheck: null,
+      pendingChoice: null,
+      targetedItemId: null,
+      outcomeCard: null,
+      companionToast: null,
       activeSensory: null,
       isSensoryOpen: false,
+      isEnriching: false,
       rewindState: null,
       canRewind: false,
       activeCG: scene?.cgIllustration || null,
       isChapterStart: true,
+      isOracleLoading: false,
       oracleMessages: [
         {
           id: `oracle-welcome-${newWorldId}`,
           role: 'model',
           text: `Летопись открыта в мире «${world.title}». Задавайте вопросы о тайнах этого мира и реликвиях героя ${world.protagonist.name}.`,
-          modelUsed: get().modelTier,
+          modelUsed: s.modelTier,
           personaName: 'Хранитель Летописи',
           timestamp: 'Готов',
         },
       ],
-    });
+    }));
 
     writeSaveSlot(existingSave);
-    if (scene) {
-      triggerSceneArtLoad(set, get, world, scene);
-    }
     SoundManager.startAmbient(newWorldId);
   },
 
@@ -494,74 +484,133 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     fresh.unlockedCGs = Array.from(new Set([...(state.unlockedCGs || [])]));
     const startScene = world.scenes[fresh.currentSceneId];
 
-    set({
+    if (startScene?.choices) {
+      preloadReadySceneArts(startScene.choices.map((c) => c.targetSceneId).filter(Boolean));
+    }
+
+    set((s) => ({
       state: fresh,
       dialogueChunkIndex: 0,
+      sceneResetCounter: s.sceneResetCounter + 1,
       isTypewriterComplete: false,
-      currentArtUrl: startScene?.localImage || world.coverImage,
+      currentArtUrl: getSceneArtUrl(startScene, world),
+      isArtLoading: false,
       activeDrawer: 'none',
       showWorldSelect: false,
       selectedCodexEntryId: null,
       showCodex: false,
+      showHotspots: false,
+      showBacklog: false,
+      showEndings: false,
+      showGallery: false,
+      showChapterChronicle: false,
+      inspectedItemDetail: null,
+      activeSkillCheck: null,
+      pendingChoice: null,
+      targetedItemId: null,
+      outcomeCard: null,
+      companionToast: null,
       activeSensory: null,
       isSensoryOpen: false,
+      isEnriching: false,
       rewindState: null,
       canRewind: false,
       activeCG: startScene?.cgIllustration || null,
       isChapterStart: true,
-    });
+    }));
 
     writeSaveSlot(fresh);
-    if (startScene) {
-      triggerSceneArtLoad(set, get, world, startScene);
-    }
   },
 
   startNewGamePlus: (keptRelicId: string) => {
     const { worldId, state } = get();
     const world = getWorld(worldId);
-    const fresh = createInitialState(world);
-    fresh.unlockedEndings = Array.from(new Set([...(state.unlockedEndings || [])]));
-    fresh.unlockedCGs = Array.from(new Set([...(state.unlockedCGs || [])]));
+    const freshRaw = createInitialState(world);
+    freshRaw.unlockedEndings = Array.from(new Set([...(state.unlockedEndings || [])]));
+    freshRaw.unlockedCGs = Array.from(new Set([...(state.unlockedCGs || [])]));
     const keptItem = state.inventory.find((i) => i.id === keptRelicId);
     if (keptItem) {
-      const idx = fresh.inventory.findIndex((i) => i.id === keptItem.id);
+      const idx = freshRaw.inventory.findIndex((i) => i.id === keptItem.id);
       if (idx >= 0) {
-        fresh.inventory[idx] = {
+        freshRaw.inventory[idx] = {
           ...keptItem,
           charges: keptItem.maxCharges || keptItem.charges,
         };
       } else {
-        fresh.inventory.push({
+        freshRaw.inventory.push({
           ...keptItem,
           charges: keptItem.maxCharges || keptItem.charges,
         });
       }
     }
-    fresh.newGamePlusRelicId = keptRelicId;
+    freshRaw.newGamePlusRelicId = keptRelicId;
+    const fresh = ensureCodexTrackingInitialized(worldId, freshRaw);
+    const startScene = world.scenes[fresh.currentSceneId];
+
+    if (startScene?.choices) {
+      preloadReadySceneArts(startScene.choices.map((c) => c.targetSceneId).filter(Boolean));
+    }
+
     writeSaveSlot(fresh);
-    get().selectWorld(worldId);
-    get().notifications.push({
-      id: `toast-ng-${Date.now()}`,
-      text: `Новая игра+ начата! Реликвия «${keptItem?.name || ''}» перенесена в новую хронологию.`,
-      type: 'item',
-    });
+    set((s) => ({
+      worldId,
+      state: fresh,
+      dialogueChunkIndex: 0,
+      sceneResetCounter: s.sceneResetCounter + 1,
+      isTypewriterComplete: false,
+      currentArtUrl: getSceneArtUrl(startScene, world),
+      isArtLoading: false,
+      activeDrawer: 'none',
+      showWorldSelect: false,
+      selectedCodexEntryId: null,
+      showCodex: false,
+      showHotspots: false,
+      showBacklog: false,
+      showEndings: false,
+      showGallery: false,
+      showChapterChronicle: false,
+      inspectedItemDetail: null,
+      activeSkillCheck: null,
+      pendingChoice: null,
+      targetedItemId: null,
+      outcomeCard: null,
+      companionToast: null,
+      activeSensory: null,
+      isSensoryOpen: false,
+      isEnriching: false,
+      rewindState: null,
+      canRewind: false,
+      activeCG: startScene?.cgIllustration || null,
+      isChapterStart: true,
+      notifications: [
+        ...s.notifications,
+        {
+          id: `toast-ng-${Date.now()}`,
+          text: `Новая игра+ начата! Реликвия «${keptItem?.name || ''}» перенесена в новую хронологию.`,
+          type: 'item',
+        },
+      ],
+    }));
   },
 
   makeChoice: (choice: SceneChoice) => {
-    const { worldId, state, modelTier, enableAtmosphere, recentSensoryTexts } = get();
+    const { worldId, state } = get();
     const world = getWorld(worldId);
 
     // Check availability
     const check = canMakeChoice(choice, state, world);
     if (!check.allowed) {
       SoundManager.playDamage();
-      get().notifications.push({
-        id: `toast-${Date.now()}`,
-        text: check.reason || 'Выбор недоступен',
-        type: 'info',
-      });
-      set({ notifications: [...get().notifications] });
+      set((s) => ({
+        notifications: [
+          ...s.notifications,
+          {
+            id: `toast-${Date.now()}`,
+            text: check.reason || 'Выбор недоступен',
+            type: 'info',
+          },
+        ],
+      }));
       return;
     }
 
@@ -581,12 +630,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         `[Story Engine] Target scene not found! Current scene: "${state.currentSceneId}", choice: "${choice.id}", missing targetSceneId: "${targetSceneId}"`
       );
       SoundManager.playDamage();
-      get().notifications.push({
-        id: `toast-missing-${Date.now()}`,
-        text: `Эта сцена ещё не написана (id: ${targetSceneId})`,
-        type: 'damage',
-      });
-      set({ notifications: [...get().notifications] });
+      set((s) => ({
+        notifications: [
+          ...s.notifications,
+          {
+            id: `toast-missing-${Date.now()}`,
+            text: `Эта сцена ещё не написана (id: ${targetSceneId})`,
+            type: 'damage',
+          },
+        ],
+      }));
       return;
     }
 
@@ -608,9 +661,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const newlyAddedItems = nextState.inventory.filter((i) => !prevItemIds.has(i.id));
 
     if (newlyAddedItems.length > 0) {
-      newlyAddedItems.forEach((item) => {
-        itemArtService.requestItemArt(item, world.id, world.artStylePrompt);
-      });
       const newFlashIds = newlyAddedItems.map((i) => i.id);
       set((s) => ({
         flashingItemIds: Array.from(new Set([...s.flashingItemIds, ...newFlashIds])),
@@ -714,18 +764,21 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     updatedState.eventLog = mergedLog;
     writeSaveSlot(updatedState);
 
-    // 2. Companion chip (маленький чип рядом со спутником / диалогом, 3 секунды)
+    // 2. Companion chip
     if (outcomeSummary.companionDelta) {
+      const toastKey = Date.now();
       set({
         companionToast: {
           name: outcomeSummary.companionDelta.name,
           delta: outcomeSummary.companionDelta.delta,
           text: outcomeSummary.companionDelta.toast,
-          key: Date.now(),
+          key: toastKey,
         },
       });
       setTimeout(() => {
-        get().dismissCompanionToast();
+        if (get().companionToast?.key === toastKey) {
+          get().dismissCompanionToast();
+        }
       }, 3000);
     }
 
@@ -794,7 +847,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       set({ hasUnreadEvents: true });
     }
 
-    // 6. Sound priority: Damage > Item > Quest > LevelUp (Codex)
+    // Sound priority: Damage > Item > Quest > LevelUp (Codex)
     if (outcomeSummary.healthDeltaTotal < 0 || outcomeSummary.sanityDeltaTotal < 0) {
       SoundManager.playDamage();
     } else if (cardItems.length > 0) {
@@ -805,74 +858,109 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       SoundManager.playLevelUp();
     }
 
-    // Trigger visual art generation
-    set({
+    // Trigger visual art generation only if aiArtEnabled is turned on
+    const isAiArtActive = get().aiArtEnabled;
+    set((s) => ({
       state: updatedState,
       dialogueChunkIndex: 0,
+      sceneResetCounter: s.sceneResetCounter + 1,
       isTypewriterComplete: false,
       activeSensory: null,
       isSensoryOpen: false,
       screenShake,
-      isArtLoading: true,
+      isArtLoading: isAiArtActive,
       rewindState: rewindSnapshot,
       canRewind: true,
       activeCG: nextScene?.cgIllustration || null,
       isChapterStart: isNewChapter,
-      targetedItemId: null, // Clear any item targeting on choice made
-    });
+      targetedItemId: null,
+    }));
 
     if (screenShake) {
-      setTimeout(() => set({ screenShake: false }), 600);
+      if (screenShakeTimer) clearTimeout(screenShakeTimer);
+      screenShakeTimer = setTimeout(() => {
+        set({ screenShake: false });
+        screenShakeTimer = null;
+      }, 600);
     }
 
-    if (nextScene) {
-      triggerSceneArtLoad(set, get, world, nextScene, choice);
+    const hasReadyArt = nextScene ? hasReadySceneArt(nextScene.id) : false;
+    const readyArtUrl = getSceneArtUrl(nextScene, world);
+
+    if (nextScene?.choices) {
+      preloadReadySceneArts(nextScene.choices.map((c) => c.targetSceneId).filter(Boolean));
     }
 
-    // Atmosphere generation with strict A1 cache & anti-repetition rules
-    if (enableAtmosphere && nextScene) {
-      if (nextScene.isEnding) {
-        // Epilogue for ending scene instead of sensory block
-        set({
-          activeSensory: {
-            sensoryDetail: '',
-            epilogueNote: nextScene.endingEpilogue || `Эпилог: «${nextScene.endingTitle || 'Завершение'}». Ваши деяния навечно изменили ткань мира.`,
-          },
-          isEnriching: false,
+    if (hasReadyArt) {
+      set({
+        currentArtUrl: readyArtUrl,
+        isArtLoading: false,
+      });
+      if (nextScene) {
+        get().addSceneArtToGallery({
+          id: `${world.id}_${nextScene.id}`,
+          worldId: world.id,
+          sceneId: nextScene.id,
+          sceneTitle: nextScene.chapterTitle || nextScene.location,
+          location: nextScene.location,
+          url: readyArtUrl,
         });
-      } else {
-        const cacheKey = `${nextScene.id}_${modelTier}_${computeStateHash(nextState)}`;
-        if (inMemorySensoryCache.has(cacheKey)) {
-          set({ activeSensory: inMemorySensoryCache.get(cacheKey)!, isEnriching: false });
-        } else {
-          set({ isEnriching: true });
-          enrichSceneText({
-            world,
-            sceneText: getSceneFullText(nextScene, nextState),
-            location: nextScene.location,
-            state: nextState,
-            modelTier,
-            recentSensoryTexts,
-            presentCompanionName: world.initialCompanion.name,
-            isEnding: false,
-          }).then((res) => {
-            if (res && res.sensoryDetail) {
-              const sensoryObj: SensoryBlockState = {
-                sensoryDetail: res.sensoryDetail,
-                companionWhisper: res.companionWhisper,
-              };
-              inMemorySensoryCache.set(cacheKey, sensoryObj);
-              set((s) => ({
-                activeSensory: sensoryObj,
-                isEnriching: false,
-                recentSensoryTexts: [...s.recentSensoryTexts.slice(-3), res.sensoryDetail],
-              }));
-            } else {
-              set({ activeSensory: null, isEnriching: false });
-            }
-          });
-        }
       }
+    } else if (isAiArtActive && nextScene) {
+      const targetWorldId = world.id;
+      const targetId = nextScene.id;
+      artQueue.requestSceneArt({
+        world,
+        scene: nextScene,
+        choice,
+        aiArtEnabled: true,
+        quality: get().aiArtQuality,
+        onSuccess: (url, isStub) => {
+          const cur = get();
+          if (cur.worldId === targetWorldId && cur.state.currentSceneId === targetId) {
+            set({ currentArtUrl: url, isArtLoading: Boolean(isStub) });
+          }
+          if (!isStub && url) {
+            get().addSceneArtToGallery({
+              id: `${targetWorldId}_${targetId}`,
+              worldId: targetWorldId,
+              sceneId: targetId,
+              sceneTitle: nextScene.chapterTitle || nextScene.location,
+              location: nextScene.location,
+              url,
+            });
+          }
+        },
+        onError: () => {
+          const cur = get();
+          if (cur.worldId === targetWorldId && cur.state.currentSceneId === targetId) {
+            set({
+              currentArtUrl: readyArtUrl,
+              isArtLoading: false,
+            });
+          }
+        },
+      });
+
+      artQueue.preloadNextScenes(world, nextScene, true, get().aiArtQuality);
+    } else {
+      set({
+        currentArtUrl: readyArtUrl,
+        isArtLoading: false,
+      });
+    }
+
+    // Epilogue check for ending scene
+    if (nextScene && nextScene.isEnding) {
+      set({
+        activeSensory: {
+          sensoryDetail: '',
+          epilogueNote: nextScene.endingEpilogue || `Эпилог: «${nextScene.endingTitle || 'Завершение'}». Ваши деяния навечно изменили ткань мира.`,
+        },
+        isEnriching: false,
+      });
+    } else {
+      set({ activeSensory: null, isEnriching: false });
     }
   },
 
@@ -896,12 +984,18 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         `[Story Engine] SkillCheck target scene not found! Current scene: "${state.currentSceneId}", choice: "${pendingChoice.id}", missing targetSceneId: "${nextTargetId}"`
       );
       SoundManager.playDamage();
-      get().notifications.push({
-        id: `toast-missing-${Date.now()}`,
-        text: `Эта сцена ещё не написана (id: ${nextTargetId || 'undefined'})`,
-        type: 'damage',
-      });
-      set({ notifications: [...get().notifications], activeSkillCheck: null, pendingChoice: null });
+      set((s) => ({
+        notifications: [
+          ...s.notifications,
+          {
+            id: `toast-missing-${Date.now()}`,
+            text: `Эта сцена ещё не написана (id: ${nextTargetId || 'undefined'})`,
+            type: 'damage',
+          },
+        ],
+        activeSkillCheck: null,
+        pendingChoice: null,
+      }));
       return;
     }
 
@@ -912,7 +1006,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     if (!success && !activeSkillCheck.failEffect) {
       const msg = activeSkillCheck.failMessage || '';
-      const hpMatch = msg.match(/-(\d+)\s*(?:HP|хп|здоровь)/i);
+      const hpMatch = msg.match(/-(\d+)\s*(?:HP|хп|ОЗ|здоровь)/i);
       const sanityMatch = msg.match(/-(\d+)\s*(?:рассуд|sanity)/i);
       const autoDelta: ChoiceEffect = {};
       if (hpMatch) {
@@ -926,16 +1020,38 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       outcomeEffect = autoDelta;
     }
 
+    const baseEffect = pendingChoice.effect || {};
+    const mergedFlagsSet = Array.from(
+      new Set([...(baseEffect.flagsSet || []), ...(outcomeEffect.flagsSet || [])])
+    );
+    const mergedFlagsUnset = Array.from(
+      new Set([...(baseEffect.flagsUnset || []), ...(outcomeEffect.flagsUnset || [])])
+    );
+    const mergedItemsAdded = [
+      ...(baseEffect.itemsAdded || []),
+      ...(outcomeEffect.itemsAdded || []),
+    ];
+    const mergedItemsRemoved = [
+      ...(baseEffect.itemsRemoved || []),
+      ...(outcomeEffect.itemsRemoved || []),
+    ];
+
     const resolvedChoice: SceneChoice = {
       ...pendingChoice,
       skillCheck: undefined, // CRITICAL: remove skillCheck so makeChoice executes instead of re-opening modal!
       targetSceneId: nextTargetId,
       effect: {
-        ...(pendingChoice.effect || {}),
+        ...baseEffect,
         ...outcomeEffect,
-        notification: success
-          ? activeSkillCheck.passMessage || 'Проверка пройдена успешно!'
-          : activeSkillCheck.failMessage || 'Проверка провалена, но сюжет продолжается!',
+        ...(mergedFlagsSet.length > 0 ? { flagsSet: mergedFlagsSet } : {}),
+        ...(mergedFlagsUnset.length > 0 ? { flagsUnset: mergedFlagsUnset } : {}),
+        ...(mergedItemsAdded.length > 0 ? { itemsAdded: mergedItemsAdded } : {}),
+        ...(mergedItemsRemoved.length > 0 ? { itemsRemoved: mergedItemsRemoved } : {}),
+        notification:
+          outcomeEffect.notification ||
+          (success
+            ? activeSkillCheck.passMessage || 'Проверка пройдена успешно!'
+            : activeSkillCheck.failMessage || 'Проверка провалена, но сюжет продолжается!'),
       },
     };
 
@@ -955,20 +1071,24 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const scene = world.scenes[rewindState.currentSceneId];
 
     writeSaveSlot(rewindState);
-    set({
+    if (scene?.choices) {
+      preloadReadySceneArts(scene.choices.map((c) => c.targetSceneId).filter(Boolean));
+    }
+    set((s) => ({
       state: rewindState,
       dialogueChunkIndex: 0,
+      sceneResetCounter: s.sceneResetCounter + 1,
       isTypewriterComplete: false,
-      currentArtUrl: scene?.localImage || world.coverImage,
+      currentArtUrl: getSceneArtUrl(scene, world),
       canRewind: false,
       rewindState: null,
       activeSensory: null,
       isSensoryOpen: false,
       notifications: [
-        ...get().notifications,
+        ...s.notifications,
         { id: `toast-rewind-${Date.now()}`, text: 'Действие отменено (откат на 1 шаг)', type: 'info' },
       ],
-    });
+    }));
   },
 
   inspectHotspot: (hotspot: SceneHotspot) => {
@@ -1019,13 +1139,17 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }
 
     if (nextState.currentSceneId !== state.currentSceneId) {
-      set({
+      if (currentScene?.choices) {
+        preloadReadySceneArts(currentScene.choices.map((c) => c.targetSceneId).filter(Boolean));
+      }
+      set((s) => ({
         dialogueChunkIndex: 0,
+        sceneResetCounter: s.sceneResetCounter + 1,
         isTypewriterComplete: false,
-        currentArtUrl: currentScene?.localImage || world.coverImage,
+        currentArtUrl: getSceneArtUrl(currentScene, world),
         activeSensory: null,
         isSensoryOpen: false,
-      });
+      }));
     }
   },
 
@@ -1055,7 +1179,62 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   toggleAutoPlay: () => set((s) => ({ autoPlay: !s.autoPlay })),
-  toggleSensoryOpen: () => set((s) => ({ isSensoryOpen: !s.isSensoryOpen })),
+  toggleSensoryOpen: () => {
+    const { isSensoryOpen, enableAtmosphere, activeSensory, isEnriching, worldId, state, modelTier, recentSensoryTexts } = get();
+    const nextSensoryOpen = !isSensoryOpen;
+    set({ isSensoryOpen: nextSensoryOpen });
+
+    if (nextSensoryOpen && enableAtmosphere && !activeSensory && !isEnriching && !isCircuitBreakerActive()) {
+      const world = getWorld(worldId);
+      const scene = world.scenes[state.currentSceneId];
+      if (scene && !scene.isEnding) {
+        const cacheKey = `${scene.id}_${modelTier}_${computeStateHash(state)}`;
+        if (inMemorySensoryCache.has(cacheKey)) {
+          set({ activeSensory: inMemorySensoryCache.get(cacheKey)!, isEnriching: false });
+        } else {
+          set({ isEnriching: true });
+          const reqWorldId = worldId;
+          const reqSceneId = scene.id;
+          enrichSceneText({
+            world,
+            sceneText: getSceneFullText(scene, state),
+            location: scene.location,
+            state,
+            modelTier,
+            recentSensoryTexts,
+            presentCompanionName: world.initialCompanion.name,
+            isEnding: false,
+          })
+            .then((res) => {
+              const cur = get();
+              if (cur.worldId !== reqWorldId || cur.state.currentSceneId !== reqSceneId) {
+                return;
+              }
+              if (res && res.sensoryDetail) {
+                const sensoryObj: SensoryBlockState = {
+                  sensoryDetail: res.sensoryDetail,
+                  companionWhisper: res.companionWhisper,
+                };
+                inMemorySensoryCache.set(cacheKey, sensoryObj);
+                set((s) => ({
+                  activeSensory: sensoryObj,
+                  isEnriching: false,
+                  recentSensoryTexts: [...s.recentSensoryTexts.slice(-3), res.sensoryDetail],
+                }));
+              } else {
+                set({ activeSensory: null, isEnriching: false });
+              }
+            })
+            .catch(() => {
+              const cur = get();
+              if (cur.worldId === reqWorldId && cur.state.currentSceneId === reqSceneId) {
+                set({ activeSensory: null, isEnriching: false });
+              }
+            });
+        }
+      }
+    }
+  },
 
   setEnableAtmosphere: (val: boolean) => {
     try {
@@ -1071,8 +1250,18 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ tagsLanguage: lang });
   },
 
-  setFontSize: (fontSize: 'sm' | 'base' | 'lg') => set({ fontSize }),
-  setTypewriterSpeedMs: (typewriterSpeedMs: number) => set({ typewriterSpeedMs }),
+  setFontSize: (fontSize: 'sm' | 'base' | 'lg') => {
+    try {
+      localStorage.setItem('vaelen_font_size', fontSize);
+    } catch {}
+    set({ fontSize });
+  },
+  setTypewriterSpeedMs: (typewriterSpeedMs: number) => {
+    try {
+      localStorage.setItem('vaelen_typewriter_speed_ms', String(typewriterSpeedMs));
+    } catch {}
+    set({ typewriterSpeedMs });
+  },
   setShowChoiceBadgeHints: (showChoiceBadgeHints: boolean) => {
     try {
       localStorage.setItem('vaelen_badge_hints', String(showChoiceBadgeHints));
@@ -1166,12 +1355,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     const result = rollbackToChapterSnapshot(world, chapterId, state);
     if (!result.success) {
-      get().notifications.push({
-        id: `toast-rollback-err-${Date.now()}`,
-        text: result.message || 'Не удалось выполнить возврат к главе.',
-        type: 'info',
-      });
-      set({ notifications: [...get().notifications] });
+      set((s) => ({
+        notifications: [
+          ...s.notifications,
+          {
+            id: `toast-rollback-err-${Date.now()}`,
+            text: result.message || 'Не удалось выполнить возврат к главе.',
+            type: 'info',
+          },
+        ],
+      }));
       return false;
     }
 
@@ -1181,31 +1374,41 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const nextScene = world.scenes[nextState.currentSceneId];
     SoundManager.playClick();
 
-    set({
+    if (nextScene?.choices) {
+      preloadReadySceneArts(nextScene.choices.map((c) => c.targetSceneId).filter(Boolean));
+    }
+
+    set((s) => ({
       state: nextState,
       dialogueChunkIndex: 0,
+      sceneResetCounter: s.sceneResetCounter + 1,
       isTypewriterComplete: false,
-      currentArtUrl: nextScene?.localImage || world.coverImage,
+      currentArtUrl: getSceneArtUrl(nextScene, world),
+      isArtLoading: false,
       activeCG: nextScene?.cgIllustration || null,
       activeSensory: null,
       isSensoryOpen: false,
+      isEnriching: false,
+      activeSkillCheck: null,
+      pendingChoice: null,
+      targetedItemId: null,
+      outcomeCard: null,
+      companionToast: null,
       rewindState: null,
       canRewind: false,
       showChapterChronicle: false,
       isChapterStart: true,
       notifications: [
-        ...get().notifications,
+        ...s.notifications,
         {
           id: `toast-rollback-${Date.now()}`,
           text: `Возврат к началу: ${targetChapter.number}. Автосохранение «До отката» создано.`,
           type: 'info',
         },
       ],
-    });
+    }));
 
-    if (nextScene) {
-      triggerSceneArtLoad(set, get, world, nextScene);
-    }
+    artQueue.preloadNextScenes(world, nextScene);
     return true;
   },
 
@@ -1215,12 +1418,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     if (!backup) return false;
 
     get().loadStateFromSave(backup.state);
-    get().notifications.push({
-      id: `toast-restore-backup-${Date.now()}`,
-      text: `Восстановлено состояние до отката (${backup.chapterNumber})`,
-      type: 'info',
-    });
-    set({ notifications: [...get().notifications] });
+    set((s) => ({
+      notifications: [
+        ...s.notifications,
+        {
+          id: `toast-restore-backup-${Date.now()}`,
+          text: `Восстановлено состояние до отката (${backup.chapterNumber})`,
+          type: 'info',
+        },
+      ],
+    }));
     return true;
   },
   setActiveCG: (activeCG) => set({ activeCG }),
@@ -1242,39 +1449,58 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
     };
 
+    // Send only prior history (excluding current userMsg to avoid duplicating it in server.ts)
+    const oracleHistory = oracleMessages.map((m) => ({
+      role: m.role,
+      text: m.text,
+    }));
+
     set({
       oracleMessages: [...oracleMessages, userMsg],
       isOracleLoading: true,
     });
 
-    const oracleHistory = [...oracleMessages, userMsg].map((m) => ({
-      role: m.role,
-      text: m.text,
-    }));
+    try {
+      const result = await askOracle({
+        message: userText,
+        history: oracleHistory,
+        modelTier,
+        world,
+        state,
+        currentSceneText: getSceneFullText(scene, state),
+      });
 
-    const result = await askOracle({
-      message: userText,
-      history: oracleHistory,
-      modelTier,
-      world,
-      state,
-      currentSceneText: getSceneFullText(scene, state),
-    });
+      if (get().worldId !== worldId) return;
 
-    const modelMsg: ChatMessage = {
-      id: `mod-${Date.now()}`,
-      role: 'model',
-      text: result.reply,
-      modelUsed: modelTier,
-      personaName: 'Хранитель Летописи',
-      latencyMs: result.latencyMs,
-      timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-    };
+      const modelMsg: ChatMessage = {
+        id: `mod-${Date.now()}`,
+        role: 'model',
+        text: result.reply,
+        modelUsed: modelTier,
+        personaName: 'Хранитель Летописи',
+        latencyMs: result.latencyMs,
+        timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      };
 
-    set({
-      oracleMessages: [...get().oracleMessages, modelMsg],
-      isOracleLoading: false,
-    });
+      set((s) => ({
+        oracleMessages: [...s.oracleMessages, modelMsg],
+        isOracleLoading: false,
+      }));
+    } catch {
+      if (get().worldId !== worldId) return;
+      const fallbackMsg: ChatMessage = {
+        id: `mod-err-${Date.now()}`,
+        role: 'model',
+        text: 'Связь с Оракулом прервалась. Попробуйте задать вопрос чуть позже.',
+        modelUsed: modelTier,
+        personaName: 'Хранитель Летописи',
+        timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      };
+      set((s) => ({
+        oracleMessages: [...s.oracleMessages, fallbackMsg],
+        isOracleLoading: false,
+      }));
+    }
   },
 
   setNotificationVerbosity: (notificationVerbosity: NotificationVerbosity) => {
@@ -1282,63 +1508,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       localStorage.setItem('vaelen_notification_verbosity', notificationVerbosity);
     } catch {}
     set({ notificationVerbosity });
-  },
-
-  setAiArtEnabled: (val: boolean) => {
-    try {
-      localStorage.setItem('vaelen_ai_art_enabled', String(val));
-    } catch {}
-    set({ aiArtEnabled: val });
-    const { worldId, state } = get();
-    const world = getWorld(worldId);
-    const scene = world.scenes[state.currentSceneId];
-    if (scene) {
-      if (!val) {
-        set({
-          currentArtUrl: scene.localImage || world.coverImage,
-          isArtLoading: false,
-        });
-      } else {
-        triggerSceneArtLoad(set, get, world, scene);
-      }
-    }
-  },
-
-  setAiArtQuality: (val: 'fast' | 'better') => {
-    try {
-      localStorage.setItem('vaelen_ai_art_quality', val);
-    } catch {}
-    set({ aiArtQuality: val });
-  },
-
-  retrySceneArt: () => {
-    const { worldId, state } = get();
-    const world = getWorld(worldId);
-    const scene = world.scenes[state.currentSceneId];
-    if (scene) {
-      artQueue.resetFailedKeys();
-      triggerSceneArtLoad(set, get, world, scene, undefined, true);
-    }
-  },
-
-  addSceneArtToGallery: (entry: Omit<SceneArtEntry, 'timestamp'>) => {
-    const { unlockedSceneArts } = get();
-    const existingIdx = unlockedSceneArts.findIndex((a) => a.id === entry.id);
-    const fullEntry: SceneArtEntry = {
-      ...entry,
-      timestamp: Date.now(),
-    };
-    let updated: SceneArtEntry[];
-    if (existingIdx >= 0) {
-      updated = [...unlockedSceneArts];
-      updated[existingIdx] = fullEntry;
-    } else {
-      updated = [fullEntry, ...unlockedSceneArts];
-    }
-    set({ unlockedSceneArts: updated });
-    try {
-      localStorage.setItem('vaelen_gallery_arts', JSON.stringify(updated.slice(0, 150)));
-    } catch {}
   },
 
   setTargetedItemId: (targetedItemId: string | null) => set({ targetedItemId }),
@@ -1363,18 +1532,37 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const scene = world.scenes[initializedSave.currentSceneId] || world.scenes[world.startSceneId];
 
     writeSaveSlot(initializedSave);
-    set({
+    if (scene?.choices) {
+      preloadReadySceneArts(scene.choices.map((c) => c.targetSceneId).filter(Boolean));
+    }
+    set((s) => ({
       worldId: initializedSave.worldId,
       state: initializedSave,
       dialogueChunkIndex: 0,
+      sceneResetCounter: s.sceneResetCounter + 1,
       isTypewriterComplete: false,
-      currentArtUrl: scene?.localImage || world.coverImage,
+      currentArtUrl: getSceneArtUrl(scene, world),
+      isArtLoading: false,
       activeDrawer: 'none',
       showWorldSelect: false,
       selectedCodexEntryId: null,
       showCodex: false,
+      showHotspots: false,
+      showBacklog: false,
+      showEndings: false,
+      showGallery: false,
+      showChapterChronicle: false,
+      inspectedItemDetail: null,
+      activeSkillCheck: null,
+      pendingChoice: null,
+      targetedItemId: null,
+      outcomeCard: null,
+      companionToast: null,
+      rewindState: null,
+      canRewind: false,
       activeSensory: null,
       isSensoryOpen: false,
+      isEnriching: false,
       isChapterStart: true,
       notifications: [
         {
@@ -1383,10 +1571,43 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
           type: 'info',
         },
       ],
-    });
+    }));
+  },
 
-    if (scene) {
-      triggerSceneArtLoad(set, get, world, scene);
-    }
+  isAnyModalOpen: () => {
+    const s = get();
+    return Boolean(
+      (s.activeDrawer && s.activeDrawer !== 'none') ||
+      s.showCodex ||
+      s.showChapterChronicle ||
+      s.showGallery ||
+      s.showBacklog ||
+      s.showEndings ||
+      s.showHotspots ||
+      s.showWorldSelect ||
+      s.activeSkillCheck ||
+      s.activeCG ||
+      s.inspectedItemDetail ||
+      s.isChapterStart ||
+      s.showEventLog
+    );
   },
 }));
+
+export function selectIsAnyModalOpen(s: GameStoreState): boolean {
+  return Boolean(
+    (s.activeDrawer && s.activeDrawer !== 'none') ||
+    s.showCodex ||
+    s.showChapterChronicle ||
+    s.showGallery ||
+    s.showBacklog ||
+    s.showEndings ||
+    s.showHotspots ||
+    s.showWorldSelect ||
+    s.activeSkillCheck ||
+    s.activeCG ||
+    s.inspectedItemDetail ||
+    s.isChapterStart ||
+    s.showEventLog
+  );
+}

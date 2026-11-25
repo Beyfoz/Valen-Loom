@@ -84,7 +84,24 @@ export function getItemHumanName(
   const registered = registry.get(itemId);
   if (registered) return registered;
 
-  return 'неизвестный предмет';
+  const knownFallbackItems: Record<string, string> = {
+    'item-commander-blade': 'Клинок Командора Вальдемара',
+    'item-anchor-shard': 'Осколок Звёздного Якоря',
+    'item-chronometer': 'Астральный Хронометр',
+    'item-celestial-compass': 'Небесный Компас',
+    'item-void-lantern': 'Фонарь Пустоты',
+    'item-depth-map': 'Карта Глубин',
+    'item-salt-amulet': 'Соляной Оберег',
+    'item-steam-core': 'Медное Паровое Ядро',
+    'item-cipher-lens': 'Шифровальная Линза',
+    'item-copper-key': 'Медный Ключ Шестерней',
+  };
+  if (knownFallbackItems[itemId]) {
+    return knownFallbackItems[itemId];
+  }
+
+  const cleaned = itemId.replace(/^item[-_]/i, '').replace(/[-_]/g, ' ');
+  return cleaned || 'неизвестный предмет';
 }
 
 export function canMakeChoice(
@@ -377,8 +394,28 @@ export function applyChoice(
   const targetScene: SceneNode | undefined = world.scenes[targetSceneId];
 
   // Register Ending if target scene is an ending
-  if (targetScene?.isEnding && !newUnlockedEndings.includes(targetSceneId)) {
-    newUnlockedEndings.push(targetSceneId);
+  if (targetScene?.isEnding) {
+    if (!newUnlockedEndings.includes(targetSceneId)) {
+      newUnlockedEndings.push(targetSceneId);
+    }
+    const isDefeatEnding =
+      targetScene.endingType === 'defeat_health' || targetScene.endingType === 'defeat_sanity';
+    if (!isDefeatEnding) {
+      for (const quest of newQuests) {
+        if (quest.status === 'active') {
+          for (const sq of quest.subQuests) {
+            if (sq.status === 'active') {
+              sq.status = 'completed';
+            }
+          }
+          quest.status = 'completed';
+          const questDoneMsg = `Задание выполнено: ${quest.title}!`;
+          if (!questUpdates.includes(questDoneMsg)) {
+            questUpdates.push(questDoneMsg);
+          }
+        }
+      }
+    }
   }
 
   // Register CG if target scene has a CG illustration
@@ -492,6 +529,21 @@ export function useItemDirectly(
   const isContextuallyNeeded = isRequiredByChoice || isRequiredByHotspot || inApplicable;
 
   const isHealing = Boolean((action.healthDelta && action.healthDelta > 0) || (action.sanityDelta && action.sanityDelta > 0));
+  const hasDirectEffect = Boolean(
+    (action.healthDelta && action.healthDelta !== 0) ||
+    (action.sanityDelta && action.sanityDelta !== 0) ||
+    (action.targetSceneId && world.scenes[action.targetSceneId])
+  );
+
+  // Guard choice-triggered relics with no direct stat/scene effect so charges are never wasted
+  if (!hasDirectEffect) {
+    return {
+      nextState: currentState,
+      notification: isContextuallyNeeded
+        ? 'Эта реликвия применяется через соответствующий вариант выбора в сцене.'
+        : 'Здесь этому предмету нет применения.',
+    };
+  }
 
   // If item is purely healing (or consumable with heal) and not required by scene context:
   if (isHealing && !isContextuallyNeeded) {
@@ -523,13 +575,19 @@ export function useItemDirectly(
   if (action.healthDelta) {
     const prev = newStats.health;
     newStats.health = Math.max(0, Math.min(newStats.maxHealth, newStats.health + action.healthDelta));
-    notification += ` (+${newStats.health - prev} HP)`;
+    const delta = newStats.health - prev;
+    if (delta !== 0) {
+      notification += ` (${delta > 0 ? `+${delta}` : delta} HP)`;
+    }
   }
 
   if (action.sanityDelta) {
     const prev = newStats.sanity;
     newStats.sanity = Math.max(0, Math.min(newStats.maxSanity, newStats.sanity + action.sanityDelta));
-    notification += ` (+${newStats.sanity - prev} Рассудок)`;
+    const delta = newStats.sanity - prev;
+    if (delta !== 0) {
+      notification += ` (${delta > 0 ? `+${delta}` : delta} Рассудок)`;
+    }
   }
 
   if (item.charges !== undefined && item.charges > 0) {
@@ -572,10 +630,29 @@ export function inspectSceneHotspot(
   success: boolean;
   message: string;
 } {
+  // Guard against duplicate inspection of already-found hotspots
+  if (currentState.hotspotsStatus?.[hotspot.id] === 'found') {
+    return {
+      nextState: currentState,
+      success: false,
+      message: 'Этот тайник уже исследован.',
+    };
+  }
+
   const newFlags = { ...currentState.flags };
   const newHotspots = { ...(currentState.hotspotsStatus || {}) };
   let newInventory = [...currentState.inventory];
   const newStats = { ...currentState.stats };
+
+  // Check required flag
+  if (hotspot.requiredFlag && !newFlags[hotspot.requiredFlag]) {
+    newHotspots[hotspot.id] = 'inspected';
+    return {
+      nextState: { ...currentState, hotspotsStatus: newHotspots },
+      success: false,
+      message: hotspot.failText || 'Условия для исследования этого ориентира ещё не выполнены.',
+    };
+  }
 
   // Check required item
   if (hotspot.requiredItem) {
@@ -585,7 +662,26 @@ export function inspectSceneHotspot(
       return {
         nextState: { ...currentState, hotspotsStatus: newHotspots },
         success: false,
-        message: `Требуется специальный предмет для вскрытия тайника.`,
+        message: hotspot.failText || 'Требуется специальный предмет для вскрытия тайника.',
+      };
+    }
+  }
+
+  // Check attribute skill roll (d20 + D&D modifier vs DC)
+  if (hotspot.check) {
+    const attrVal = currentState.attributes?.[hotspot.check.attribute] ?? 10;
+    const mod = Math.floor((attrVal - 10) / 2);
+    const roll = Math.floor(Math.random() * 20) + 1;
+    const total = roll + mod;
+    if (total < hotspot.check.dc) {
+      newHotspots[hotspot.id] = 'inspected';
+      const modStr = mod >= 0 ? `+${mod}` : `${mod}`;
+      return {
+        nextState: { ...currentState, hotspotsStatus: newHotspots },
+        success: false,
+        message:
+          hotspot.failText ||
+          `Проверка не удалась (бросок d20: ${roll}${modStr} = ${total}, нужно КС ${hotspot.check.dc}). Попробуйте снова или осмотритесь внимательнее.`,
       };
     }
   }
@@ -598,7 +694,7 @@ export function inspectSceneHotspot(
         i.id === hotspot.rewardItem!.id ? { ...i, quantity: i.quantity + (hotspot.rewardItem!.quantity || 1) } : i
       );
     } else {
-      newInventory.push(hotspot.rewardItem);
+      newInventory.push({ ...hotspot.rewardItem });
     }
   }
 
@@ -696,11 +792,18 @@ export function migrateSaveState(raw: any, world: WorldModule): GameSaveState {
 
   const initial = createInitialState(world);
 
+  const validSceneId =
+    raw.currentSceneId && world.scenes[raw.currentSceneId]
+      ? raw.currentSceneId
+      : world.startSceneId;
+
   // If already version 3
   if (raw.schemaVersion === SAVE_SCHEMA_VERSION) {
     return {
       ...initial,
       ...raw,
+      worldId: world.id,
+      currentSceneId: validSceneId,
       stats: { ...initial.stats, ...(raw.stats || {}) },
       attributes: { ...initial.attributes, ...(raw.attributes || {}) },
       inventory: Array.isArray(raw.inventory) ? raw.inventory : initial.inventory,
@@ -750,8 +853,8 @@ export function migrateSaveState(raw: any, world: WorldModule): GameSaveState {
 
   return {
     schemaVersion: SAVE_SCHEMA_VERSION,
-    worldId: raw.worldId || world.id,
-    currentSceneId: raw.currentSceneId || world.startSceneId,
+    worldId: world.id,
+    currentSceneId: validSceneId,
     stats: { ...initial.stats, ...(raw.stats || {}) },
     attributes: world.initialAttributes || { strength: 12, intellect: 12, perception: 12, charisma: 12 },
     companionRelationship: typeof raw.companionRelationship === 'number' ? raw.companionRelationship : 0,

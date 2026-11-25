@@ -444,6 +444,8 @@ export const DialogueBox: React.FC = () => {
     activeSensory,
     isEnriching,
     typewriterSpeedMs,
+    fontSize,
+    sceneResetCounter,
     autoPlay,
     toggleAutoPlay,
     canRewind,
@@ -465,6 +467,7 @@ export const DialogueBox: React.FC = () => {
     openCodexWithEntry,
     choiceDisplayMode,
     companionToast,
+    isAnyModalOpen,
   } = useGameStore();
 
   const world = getWorld(worldId);
@@ -519,11 +522,11 @@ export const DialogueBox: React.FC = () => {
   // Time when typewriter finished to protect against accidental double tap (200ms)
   const typewriterCompletedAtRef = useRef<number>(0);
 
-  // Sync / Reset choicesOpen in false (Пункт 8)
+  // Sync / Reset choicesOpen in false only on genuine scene transitions or campaign resets
   useEffect(() => {
     setSubChunkIndex(0);
     setChoicesOpen(false);
-  }, [state.currentSceneId, state.history?.length, state.savedAt]);
+  }, [worldId, state.currentSceneId, sceneResetCounter]);
 
   // Keep in bounds
   const clampedIndex = Math.min(subChunkIndex, expandedPages.length - 1);
@@ -539,9 +542,13 @@ export const DialogueBox: React.FC = () => {
   const [localTypewriterDone, setLocalTypewriterDone] = useState(false);
   const [showNGPlus, setShowNGPlus] = useState(false);
 
+  const isModalBlocked = isAnyModalOpen() || showNGPlus;
+  const isModalBlockedRef = useRef(isModalBlocked);
+  isModalBlockedRef.current = isModalBlocked;
+
   // Typewriter interval timer ref (ЧАСТЬ A)
   const typewriterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [isCtrlHeld, setIsCtrlHeld] = useState(false);
+  const isCtrlHeldRef = useRef(false);
 
   // Badge handbook popover state (ЧАСТЬ C)
   const [showBadgeHelp, setShowBadgeHelp] = useState(false);
@@ -563,27 +570,36 @@ export const DialogueBox: React.FC = () => {
     skipTypewriter();
   };
 
-  // Listen for Ctrl key to speed up typewriter by 5x (ЧАСТЬ A)
+  // Listen for Ctrl key to speed up typewriter by 5x without restarting progress
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isModalBlockedRef.current) {
+        isCtrlHeldRef.current = false;
+        return;
+      }
       if (e.key === 'Control' || e.ctrlKey) {
-        setIsCtrlHeld(true);
+        isCtrlHeldRef.current = true;
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Control' || !e.ctrlKey) {
-        setIsCtrlHeld(false);
+        isCtrlHeldRef.current = false;
       }
+    };
+    const handleBlur = () => {
+      isCtrlHeldRef.current = false;
     };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
     };
   }, []);
 
-  // Main Typewriter Effect with ref management & 0ms instant mode (ЧАСТЬ A)
+  // Main Typewriter Effect with ref management & 0ms instant mode (pauses cleanly while modals are open)
   useEffect(() => {
     stopTypewriter();
 
@@ -601,7 +617,8 @@ export const DialogueBox: React.FC = () => {
     let idx = 0;
 
     typewriterTimerRef.current = setInterval(() => {
-      idx += isCtrlHeld ? 5 : 1;
+      if (isModalBlockedRef.current) return;
+      idx += isCtrlHeldRef.current ? 5 : 1;
       if (idx >= currentChunkText.length) {
         stopTypewriter();
         setDisplayedText(currentChunkText);
@@ -616,49 +633,21 @@ export const DialogueBox: React.FC = () => {
     return () => {
       stopTypewriter();
     };
-  }, [currentChunkText, typewriterSpeedMs, isCtrlHeld, skipTypewriter]);
-
-  // Stop typewriter when modals or drawers are opened to prevent leaks (ЧАСТЬ A7)
-  useEffect(() => {
-    if (
-      showCodex ||
-      showGallery ||
-      showEndings ||
-      showBacklog ||
-      showChapterChronicle ||
-      showWorldSelect ||
-      inspectedItemDetail ||
-      activeSkillCheck ||
-      (activeDrawer && activeDrawer !== 'none')
-    ) {
-      stopTypewriter();
-    }
-  }, [
-    showCodex,
-    showGallery,
-    showEndings,
-    showBacklog,
-    showChapterChronicle,
-    showWorldSelect,
-    inspectedItemDetail,
-    activeSkillCheck,
-    activeDrawer,
-  ]);
+  }, [currentChunkText, typewriterSpeedMs, skipTypewriter]);
 
   // Choices mode is active only when on the last page, typewriter finished, and choicesOpen is true (Пункт 1)
   // or if setting is 'auto', automatically open unless skipped manually
   const isChoiceMode = isLastChunk && localTypewriterDone && choicesOpen;
 
-  // Auto-open choices when setting is 'auto' and typewriter finished naturally (not skipped during typing)
+  // Auto-open choices when setting is 'auto' and typewriter finished naturally
   useEffect(() => {
-    if (choiceDisplayMode === 'auto' && isLastChunk && localTypewriterDone && !choicesOpen) {
-      // Small timeout to allow reading last sentence or instant transition
+    if (choiceDisplayMode === 'auto' && isLastChunk && localTypewriterDone && !choicesOpen && !isModalBlocked) {
       const timer = setTimeout(() => {
         setChoicesOpen(true);
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [choiceDisplayMode, isLastChunk, localTypewriterDone, choicesOpen]);
+  }, [choiceDisplayMode, isLastChunk, localTypewriterDone, choicesOpen, isModalBlocked]);
 
   const advanceSubChunk = () => {
     if (!localTypewriterDone) {
@@ -690,16 +679,16 @@ export const DialogueBox: React.FC = () => {
     setChoicesOpen(false);
   };
 
-  // AutoPlay logic: stops on last chunk and waits for player (Пункт 5)
+  // AutoPlay logic: stops on last chunk and pauses while modals are open
   useEffect(() => {
-    if (!autoPlay) return;
+    if (!autoPlay || isModalBlocked) return;
     if (localTypewriterDone && !isLastChunk) {
       const timer = setTimeout(() => {
         advanceSubChunk();
       }, 2200);
       return () => clearTimeout(timer);
     }
-  }, [autoPlay, localTypewriterDone, isLastChunk, clampedIndex]);
+  }, [autoPlay, isModalBlocked, localTypewriterDone, isLastChunk, clampedIndex]);
 
   const advanceSubChunkRef = useRef(advanceSubChunk);
   advanceSubChunkRef.current = advanceSubChunk;
@@ -710,9 +699,32 @@ export const DialogueBox: React.FC = () => {
   const isChoiceModeRef = useRef(isChoiceMode);
   isChoiceModeRef.current = isChoiceMode;
 
-  // Keyboard controls: Space / Enter to advance, Backspace / ArrowUp to reread (Пункт 4, 7)
+  // Filter out choices hidden when locked
+  const visibleChoices = useMemo(() => {
+    if (!currentScene?.choices) return [];
+    return currentScene.choices.filter((choice) => {
+      if (choice.hideIfLocked) {
+        const check = canMakeChoice(choice, state, world);
+        return check.allowed;
+      }
+      return true;
+    });
+  }, [currentScene?.choices, state, world]);
+
+  const visibleChoicesRef = useRef(visibleChoices);
+  visibleChoicesRef.current = visibleChoices;
+
+  const makeChoiceRef = useRef(makeChoice);
+  makeChoiceRef.current = makeChoice;
+
+  // Keyboard controls: Space / Enter to advance, Backspace / ArrowUp to reread, digits to pick choice (Пункт 4, 7)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 1. If any modal / window is open, DialogueBox must NOT react to Space, Enter, ArrowUp, Backspace, Ctrl, or digits!
+      if (isModalBlockedRef.current) {
+        return;
+      }
+
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
@@ -730,6 +742,20 @@ export const DialogueBox: React.FC = () => {
         e.preventDefault();
         reReadSceneRef.current();
         return;
+      }
+
+      // Digits (1-9) for selecting choices when in choices mode
+      if (isChoiceModeRef.current) {
+        const digitMatch = e.code.match(/^(?:Digit|Numpad)([1-9])$/);
+        if (digitMatch) {
+          const choiceIndex = parseInt(digitMatch[1], 10) - 1;
+          const choice = visibleChoicesRef.current[choiceIndex];
+          if (choice) {
+            e.preventDefault();
+            makeChoiceRef.current(choice);
+            return;
+          }
+        }
       }
 
       if (e.code === 'Space' || e.code === 'Enter') {
@@ -757,18 +783,6 @@ export const DialogueBox: React.FC = () => {
       } catch {}
     }
   }, [currentScene?.id]);
-
-  // Filter out choices hidden when locked
-  const visibleChoices = useMemo(() => {
-    if (!currentScene?.choices) return [];
-    return currentScene.choices.filter((choice) => {
-      if (choice.hideIfLocked) {
-        const check = canMakeChoice(choice, state, world);
-        return check.allowed;
-      }
-      return true;
-    });
-  }, [currentScene?.choices, state, world]);
 
   // Close badge popover on outside click or Esc (ЧАСТЬ C)
   useEffect(() => {
@@ -1244,9 +1258,9 @@ export const DialogueBox: React.FC = () => {
             boxShadow: 'inset 0 0 0 1px #4A3A22, 0 16px 40px rgba(0,0,0,0.85)',
           }}
           onClick={() => {
-            if (!isChoiceMode) {
-              advanceSubChunk();
-            }
+            if (isChoiceMode) return;
+            if (typeof window !== 'undefined' && window.getSelection()?.toString()) return;
+            advanceSubChunk();
           }}
         >
           {/* 32px smooth gradient transition band above the frame */}
@@ -1332,13 +1346,16 @@ export const DialogueBox: React.FC = () => {
               (When not yet at final choice stage)
             */}
             {!isChoiceMode && (
-              <div
-                className="flex-1 flex flex-col justify-between cursor-pointer"
-                onClick={() => advanceSubChunk()}
-              >
+              <div className="flex-1 flex flex-col justify-between cursor-pointer">
                 <div className="max-w-[62ch] mx-auto w-full pt-1 select-text">
                   <div
-                    className="font-prose text-[#EFE6CF] text-[16px] sm:text-[18px] leading-[1.65] font-normal tracking-[0.01em]"
+                    className={`font-prose text-[#EFE6CF] ${
+                      fontSize === 'sm'
+                        ? 'text-[14px] sm:text-[15px]'
+                        : fontSize === 'lg'
+                        ? 'text-[18px] sm:text-[20px]'
+                        : 'text-[16px] sm:text-[18px]'
+                    } leading-[1.65] font-normal tracking-[0.01em]`}
                     style={{ textShadow: '0 1px 3px rgba(0, 0, 0, 0.85)' }}
                   >
                     <p
@@ -1428,9 +1445,9 @@ export const DialogueBox: React.FC = () => {
                 >
                   <p
                     className="font-prose italic text-[13px] sm:text-[14px] leading-snug text-[#A89E88] line-clamp-2 flex-1"
-                    title={currentPage.text}
+                    title={currentPage.text.replace(/\*\*/g, '').replace(/\*/g, '')}
                   >
-                    «{currentPage.text}»
+                    «{currentPage.text.replace(/\*\*/g, '').replace(/\*/g, '')}»
                   </p>
 
                   <div className="flex items-center gap-2 shrink-0 pt-0.5">

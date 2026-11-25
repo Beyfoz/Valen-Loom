@@ -96,12 +96,28 @@ export function useInventoryLogic({
 
   const isItemApplicableHere = (item: Item): boolean => {
     if (!item.usable || (item.charges !== undefined && item.charges <= 0)) return false;
+
+    // 1. Scene choice requires this item (hasItem or hasItemsAll)
     const hasChoiceWithItem = currentScene?.choices?.some(
       (c) => c.condition?.hasItem === item.id || c.condition?.hasItemsAll?.includes(item.id)
     );
     if (hasChoiceWithItem) return true;
+
+    // 2. Scene explicitly listed in applicableInScenes
     if (item.useAction?.applicableInScenes?.includes(state.currentSceneId)) return true;
-    return item.category === 'Consumable';
+
+    // 3. Item heals health or sanity, and corresponding stat is below max
+    const healthDelta = item.useAction?.healthDelta || 0;
+    const sanityDelta = item.useAction?.sanityDelta || 0;
+    const healsHealth = healthDelta > 0 && state.stats.health < state.stats.maxHealth;
+    const healsSanity = sanityDelta > 0 && state.stats.sanity < state.stats.maxSanity;
+    if (healsHealth || healsSanity) return true;
+
+    // 4. requiredSceneFlag is met in current state flags
+    const reqFlag = item.useAction?.requiredSceneFlag;
+    if (reqFlag && state.flags[reqFlag]) return true;
+
+    return false;
   };
 
   const handleSelect = (item: Item) => {
@@ -166,7 +182,12 @@ export function useInventoryLogic({
         }
       } else if (e.key === 'u' || e.key === 'U' || e.key === 'г' || e.key === 'Г') {
         e.preventDefault();
-        if (activeItem && isItemApplicableHere(activeItem)) {
+        if (
+          activeItem &&
+          activeItem.usable &&
+          activeItem.useAction &&
+          !(activeItem.charges !== undefined && activeItem.charges <= 0)
+        ) {
           handleUse(activeItem);
         }
       }
@@ -174,7 +195,7 @@ export function useInventoryLogic({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [sortedItems, activeItem, selectedItemId, onClose, onInspectItem]);
+  }, [sortedItems, activeItem, selectedItemId, state, onUseItem, onClose, onInspectItem]);
 
   return {
     invTab,

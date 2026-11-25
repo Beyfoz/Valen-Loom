@@ -17,8 +17,14 @@ export const BacklogModal: React.FC<BacklogModalProps> = ({ entries, onClose }) 
   }, [entries]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="w-full max-w-2xl h-[85vh] rounded-2xl bg-[#0E1321] border border-white/15 flex flex-col shadow-2xl overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl h-[85vh] rounded-2xl bg-[#0E1321] border border-white/15 flex flex-col shadow-2xl overflow-hidden"
+      >
         {/* Header */}
         <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/30">
           <div className="flex items-center gap-2">

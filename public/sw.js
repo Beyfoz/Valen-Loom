@@ -2,7 +2,7 @@
 // Versioned caching: Cache-first for static assets and scene artwork, Network-first for shell HTML,
 // strictly bypasses all /api/* requests.
 
-const CACHE_VERSION = 'v1.1.0';
+const CACHE_VERSION = 'v1.2.0';
 const SHELL_CACHE_NAME = `vaelen-shell-${CACHE_VERSION}`;
 const ASSETS_CACHE_NAME = `vaelen-assets-${CACHE_VERSION}`;
 const IMAGES_CACHE_NAME = `vaelen-images-${CACHE_VERSION}`;
@@ -60,7 +60,6 @@ self.addEventListener('fetch', (event) => {
     url.pathname.includes('/@vite/') ||
     url.pathname.includes('/@fs/') ||
     url.pathname.includes('/@id/') ||
-    url.searchParams.has('v') ||
     url.pathname.startsWith('/src/')
   ) {
     return; // Pure native browser fetch, no SW interception
@@ -72,8 +71,38 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // 1c. SCENE ART MANIFEST: Network-First under canonical key (never cache as image)
+  if (url.pathname === '/scenes/manifest.json') {
+    const canonicalKey = new Request('/scenes/manifest.json');
+    event.respondWith(
+      fetch(req)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(ASSETS_CACHE_NAME).then((cache) => {
+              cache.put(canonicalKey, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(canonicalKey).then(
+            (cached) =>
+              cached ||
+              new Response(JSON.stringify({ scenes: {} }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              })
+          );
+        })
+    );
+    return;
+  }
+
   // 2. SCENE IMAGES & ARTWORK: Cache-First strategy
   if (
+    (url.pathname.startsWith('/scenes/') && !url.pathname.endsWith('.json')) ||
+    url.pathname.startsWith('/images/') ||
     url.pathname.includes('/assets/images/') ||
     /\.(webp|jpg|jpeg|png|svg|ico)$/i.test(url.pathname)
   ) {
@@ -93,8 +122,9 @@ self.addEventListener('fetch', (event) => {
             return networkResponse;
           })
           .catch(() => {
-            // Offline image fallback if needed
-            return caches.match('/assets/images/preset_world_eldoria_1791455431121.webp');
+            return caches
+              .match('/images/preset_world_eldoria_1791455431121.webp')
+              .then((fallback) => fallback || new Response('', { status: 503 }));
           });
       })
     );
@@ -113,15 +143,17 @@ self.addEventListener('fetch', (event) => {
         if (cachedResponse) {
           return cachedResponse;
         }
-        return fetch(req).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const responseToCache = networkResponse.clone();
-            caches.open(ASSETS_CACHE_NAME).then((cache) => {
-              cache.put(req, responseToCache);
-            });
-          }
-          return networkResponse;
-        });
+        return fetch(req)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const responseToCache = networkResponse.clone();
+              caches.open(ASSETS_CACHE_NAME).then((cache) => {
+                cache.put(req, responseToCache);
+              });
+            }
+            return networkResponse;
+          })
+          .catch(() => new Response('', { status: 503 }));
       })
     );
     return;
@@ -141,7 +173,10 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(() => {
-          return caches.match(req).then((cached) => cached || caches.match('/index.html'));
+          return caches
+            .match(req)
+            .then((cached) => cached || caches.match('/index.html'))
+            .then((fallback) => fallback || new Response('Offline', { status: 503 }));
         })
     );
     return;
@@ -150,15 +185,17 @@ self.addEventListener('fetch', (event) => {
   // 5. Default: Stale-while-revalidate for any other assets
   event.respondWith(
     caches.match(req).then((cached) => {
-      const fetchPromise = fetch(req).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(ASSETS_CACHE_NAME).then((cache) => {
-            cache.put(req, responseToCache);
-          });
-        }
-        return networkResponse;
-      });
+      const fetchPromise = fetch(req)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(ASSETS_CACHE_NAME).then((cache) => {
+              cache.put(req, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => cached || new Response('', { status: 503 }));
       return cached || fetchPromise;
     })
   );

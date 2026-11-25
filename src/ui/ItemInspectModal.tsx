@@ -198,7 +198,7 @@ export const ItemInspectModal: React.FC<ItemInspectModalProps> = ({
                 <span>В Кодексе</span>
               </button>
             )}
-            {item.usable && onUse && (
+            {item.usable && item.useAction && onUse && (
               <button
                 type="button"
                 disabled={isDepleted}
@@ -214,7 +214,7 @@ export const ItemInspectModal: React.FC<ItemInspectModalProps> = ({
                 }`}
               >
                 <Zap className="w-4 h-4 text-[#C9A55C]" />
-                <span>{item.useAction?.label || 'Применить'}</span>
+                <span>{item.useAction.label || 'Применить'}</span>
               </button>
             )}
             <button

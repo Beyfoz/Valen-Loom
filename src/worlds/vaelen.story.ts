@@ -13,7 +13,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_prologue_salt_vault',
       chapterTitle: 'Глава I: Волнолом Шепчущих Вод',
       location: 'Склеп под Волноломом — Соляной Саркофаг',
-      localImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      localImage: '/images/preset_world_eldoria_1791455431121.webp',
       visualPrompt:
         'young knight waking inside translucent salt sarcophagus in dark flooded crypt, salt crystals breaking, lantern light reflecting in saltwater pool, mysterious young scholar woman waiting',
       actionFocus: 'Кейлен открывает глаза: треск соли и первый вдох после трёх сотен лет сна',
@@ -75,7 +75,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_prologue_crossing',
       chapterTitle: 'Глава I: Волнолом Шепчущих Вод',
       location: 'Затопленный пролив — Могила Кораблей',
-      localImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      localImage: '/images/preset_world_eldoria_1791455431121.webp',
       visualPrompt:
         'wooden rowboat navigating dark foggy waters between jagged black shipwrecks, distant titanic cyclopean citadel wall looming, pale dawn sky, three faint moons',
       actionFocus: 'Лодка скользит между остовами паломнических судов навстречу громаде Волнолома',
@@ -150,6 +150,7 @@ export const vaelenStory: StoryPack = {
           approach: 'Diplomatic',
           effect: {
             relationshipDelta: 1,
+            flagsSet: ['knows_lullaby'],
             companionToast: 'Сера ценит твою осторожность (+1)',
             notification: '«Потому что глубина окликнет тебя в ответ тем же голосом», — ответила она.',
           },
@@ -162,7 +163,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_gate_echo_oyvin',
       chapterTitle: 'Глава I: Волнолом Шепчущих Вод',
       location: 'Внешние Ворота Волнолома — Ниша Привратника',
-      localImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      localImage: '/images/preset_world_eldoria_1791455431121.webp',
       visualPrompt:
         'massive rusted iron gate set in cyclopean sea wall, carved stone mouth weeping salt crystals with faint blue eyes inside dark grille, salt merchant spirit',
       actionFocus: 'Соляное эхо в бронзовой решётке ворот оживает, требуя пошлину за проход',
@@ -258,7 +259,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_cloister_mara',
       chapterTitle: 'Глава I: Волнолом Шепчущих Вод',
       location: 'Плачущий Клуатр — Запустелый Неф',
-      localImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      localImage: '/images/preset_world_eldoria_1791455431121.webp',
       visualPrompt:
         'young frail girl covered in encrusted salt crystals huddling behind broken weeping saint statue, feral posture, wide fearful human eyes reflecting lantern light, compassionate knight kneeling',
       actionFocus: 'Фонарь выхватывает из тьмы не чудовище, а маленькую соляную девочку',
@@ -341,7 +342,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_tidewarden_barracks',
       chapterTitle: 'Глава II: Механизмы Утонувших',
       location: 'Казармы Ордена Волнолома — Покои Рыцарей',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'flooded knight barracks, stone bunks covered in barnacles and dried salt, rusted weapon racks, heavy iron chest embossed with a hawk soaring over waves emblem, melancholic atmospheric light',
       actionFocus: 'Кейлен находит аккуратно застеленную койку и сундук с гербом своего рода',
@@ -404,7 +405,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_memory_market',
       chapterTitle: 'Глава II: Механизмы Утонувших',
       location: 'Осушенный Шлюзовой Базар — Рынок Памяти',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'underwater subterranean market hall dimly lit by bioluminescent sea lamps, hooded faceless salt merchant behind brass counter displaying rows of glowing glass vials filled with swirling memories',
       actionFocus: 'Безликий соляной купец предлагает купить или продать драгоценные крупицы памяти',
@@ -505,7 +506,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_camp_salt_fire',
       chapterTitle: 'Глава II: Механизмы Утонувших',
       location: 'Опорный шурф — Соляной Привал',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'quiet camp in a deep dry salt cavern, blue fire glowing softly on crystalline hearth, tired female scholar and weary knight resting, warm intimate gothic atmosphere',
       actionFocus: 'Привал у синего соляного костра: время доверительного разговора',
@@ -549,7 +550,7 @@ export const vaelenStory: StoryPack = {
         {
           id: 'c_camp_ask_whispers',
           text: '«О чём поёт шёпот в стенах, Сера? Научи меня слышать его»',
-          targetSceneId: 'v_scriptorium_entry',
+          targetSceneId: 'v_salt_chapel',
           tag: 'DIALOGUE',
           approach: 'Arcane',
           effect: {
@@ -579,7 +580,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_observatory_star',
       chapterTitle: 'Глава II: Механизмы Утонувших',
       location: 'Глубинная Обсерватория — Иллюминатор в Пропасть',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'titanic cosmic fallen star trapped at the bottom of underwater oceanic abyss inside glowing frozen time sphere, ancient bronze armillary sphere model, breathtaking majestic gothic sci-fantasy',
       actionFocus: 'Сера и Кейлен смотрят сквозь хрустальный купол на застывшую звезду Эльтар',
@@ -662,7 +663,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_chapel_isolde',
       chapterTitle: 'Глава II: Механизмы Утонувших',
       location: 'Соляная Капелла — Алтарь Застывшего Хора',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'crystalline sunken chapel with towering statues of weeping veiled nuns made entirely of translucent white salt, blue spectral light from choir, venerable salt mother spirit standing before altar',
       actionFocus: 'Мать Изольда и Хор Соляных Сестёр поют песнь добровольного заклания',
@@ -771,7 +772,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_scriptorium_truth',
       chapterTitle: 'Глава III: Шепчущий Скрипторий',
       location: 'Скрипторий — Потайной Архиварий',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'ancient waterlogged archive room with towering bookshelves encrusted with salt, glowing parchment with handwritten margin notes, pale scholar woman caught looking pale and guilty',
       actionFocus: 'Кейлен читает тайную пометку на полях фолианта: заговор Архива раскрыт',
@@ -817,7 +818,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_sera_confession',
       chapterTitle: 'Глава III: Шепчущий Скрипторий',
       location: 'Скрипторий — Уединённый Свод',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'young dark-haired female scholar crying softly in shadowy flooded cloister, hand clutching brass signet ring, knight standing solemnly before her, candle-like salt lanterns',
       actionFocus: 'Исповедь Серы Никс: слёзы, правда о приказе Примы и выбор прощения',
@@ -906,7 +907,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_scriptorium_archives',
       chapterTitle: 'Глава III: Шепчущий Скрипторий',
       location: 'Тайный Архив Скриптория — Свинцовый Реестр',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'vast cavernous flooded library drained of black water, towering lead tablets inscribed with thousands of names in gold leaf, quiet awe-inspiring sanctuary of solemn memory',
       actionFocus: 'Кейлен читает запись в Свинцовом Реестре: имя старшего брата выбито золотом',
@@ -993,7 +994,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_bridge_eve',
       chapterTitle: 'Глава IV: Врата Бездны',
       location: 'Базальтовый выступ — Канун Моста Бездны',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'solemn moonlit cliff edge overlooking immense bottomless black abyss, three moons in dark violet sky, distant colossal guardian standing silent on cyclopean bridge, knight and scholar resting by campfire',
       actionFocus: 'Кейлен и Сера у края Пропасти: три луны в зените перед решающей битвой',
@@ -1046,7 +1047,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_sentinel_recall',
       chapterTitle: 'Глава IV: Врата Бездны',
       location: 'Мост Врат Бездны — Рубеж Стража',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'armored eight-foot giant guardian freezing mid-strike, tears of pure saltwater breaking through dark iron helm visor, glowing memories surrounding kneeling younger knight',
       actionFocus: 'Голос Кейлена пробивает вековую глухоту соли: Страж замирает',
@@ -1083,7 +1084,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_sentinel_defeated',
       chapterTitle: 'Глава IV: Врата Бездны',
       location: 'Мост Врат Бездны — Поверженный Рубеж',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'massive hollow guardian armor kneeling down solemnly or dissipating into shimmering crystalline salt dust on bridge, open doorway to inner sanctum behind him glowing with golden ethereal light',
       actionFocus: 'Рубеж преодолён: Полый Страж отступает или рассыпается, открывая путь к Тронному Залу',
@@ -1199,7 +1200,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_throne_prima',
       chapterTitle: 'Глава V: Сердце Прилива',
       location: 'Преддверие Тронного Зала — Пост Примы',
-      localImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      localImage: '/images/preset_world_eldoria_1791455431121.webp',
       visualPrompt:
         'grand flooded antechamber with marble columns covered in crystalline salt, formidable elderly matriarch in scholar robes flanked by six masked salt reapers with scythes, tense dramatic standoff',
       actionFocus: 'Прима Мелиор преграждает путь к Астролябии: холодный прагматизм против свободы',
@@ -1274,7 +1275,7 @@ export const vaelenStory: StoryPack = {
       id: 'v_king_echo',
       chapterTitle: 'Глава V: Сердце Прилива',
       location: 'Алтарь Астролябии — Резонанс Короны',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'spinning golden rings of giant astrolabe, spectral golden crowned king silhouette speaking gently, glowing memory fragments swirling in air, profound spiritual atmosphere',
       actionFocus: 'Прикосновение к кольцам Астролябии: дух Короля Ауреана открывает тайну искупления',
@@ -1313,7 +1314,7 @@ export const vaelenStory: StoryPack = {
       endingTitle: 'Возвращённая Память (Истинный Финал)',
       endingEpilogue:
         'Эпилог: Соль растаяла чистыми ручьями. Сорок тысяч душ проснулись и удержали падающую звезду вместе. Велен всплыл свободным городом.',
-      localImage: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      localImage: '/images/preset_world_eldoria_1791455431121.webp',
       visualPrompt:
         'magnificent golden dawn over flooded gothic city rising from ocean, smiling young female scholar with tears looking at resurrected people, gentle knight standing beside tall brother holding a blossoming apple branch',
       actionFocus: 'Истинный триумф: соляные кристаллы тают, возрождая павших жителей Велена',
@@ -1341,7 +1342,7 @@ export const vaelenStory: StoryPack = {
       endingTitle: 'Вахта Вэнсов (Рыцарский Долг)',
       endingEpilogue:
         'Эпилог: Кейлен встал на мост, приняв доспехи Стража, чтобы старший брат мог уйти на покой. Сера дала клятву вернуться с ответом.',
-      localImage: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      localImage: '/images/preset_world_eldoria_1791453485261.webp',
       visualPrompt:
         'melancholic twilight scene on cyclopean bridge, young knight donning the heavy salt guardian armor while older brother leaves into the dawn with tears, sad brave heroine looking back from rowboat',
       actionFocus: 'Кейлен занимает мост вместо брата, принимая вечную вахту над пучиной',
@@ -1658,7 +1659,7 @@ export const vaelenStory: StoryPack = {
       description: 'Кейлен подчиняет силу Астролябии Короля Приливов и возрождает Цитадель Велена из пучины морской.',
       hint: 'Синхронизируйте рассудок с Астролябией при высоком уровне стойкости разума (Sanity >= 40).',
       endingType: 'victory',
-      cgUrl: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      cgUrl: '/images/preset_world_eldoria_1791455431121.webp',
     },
     {
       id: 'v_ending_dam_break',
@@ -1666,7 +1667,7 @@ export const vaelenStory: StoryPack = {
       description: 'Астролябия сокрушена ударом боевого клевца. Дамба рушится, и пучина смывает проклятие вековых теней.',
       hint: 'Выберите сокрушение Астролябии во имя упокоения павших душ.',
       endingType: 'destruction',
-      cgUrl: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      cgUrl: '/images/preset_world_eldoria_1791453485261.webp',
     },
     {
       id: 'v_ending_seal_ward',
@@ -1674,7 +1675,7 @@ export const vaelenStory: StoryPack = {
       description: 'Кейлен и Сера объединяют приливный огонь фонаря и соляные глифы, запечатывая бездну навеки.',
       hint: 'Сохраните Приливный Фонарь и созидательный союз с Серой до финала.',
       endingType: 'sacrifice',
-      cgUrl: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      cgUrl: '/images/preset_world_eldoria_1791455431121.webp',
     },
     {
       id: 'v_ending_return',
@@ -1682,7 +1683,7 @@ export const vaelenStory: StoryPack = {
       description: 'Кейлен возвращает память народу Велена через три Осколка Памяти и слово Короля. Звезда оседает мирным островом, а город возрождается.',
       hint: 'Соберите три Осколка Памяти (Колыбельной, Присяги, Имени), услышьте совет Короля Ауреана и заслужите доверие Серы.',
       endingType: 'victory',
-      cgUrl: '/src/assets/images/preset_world_eldoria_1791455431121.webp',
+      cgUrl: '/images/preset_world_eldoria_1791455431121.webp',
     },
     {
       id: 'v_ending_new_sentinel',
@@ -1690,7 +1691,7 @@ export const vaelenStory: StoryPack = {
       description: 'Кейлен встаёт на мост, принимая соляные доспехи Полого Стража, чтобы старший брат Эйрик мог наконец уйти на покой.',
       hint: 'Примиритесь с братом на мосту и выберите самопожертвование во имя его освобождения.',
       endingType: 'sacrifice',
-      cgUrl: '/src/assets/images/preset_world_eldoria_1791453485261.webp',
+      cgUrl: '/images/preset_world_eldoria_1791453485261.webp',
     },
   ],
 };

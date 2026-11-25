@@ -113,7 +113,8 @@ interface QueueTask {
 class ItemArtServiceClass {
   private idb = new IndexedDBStorage();
   private memoryCache = new Map<string, string>();
-  private generatingSet = new Set<string>(); // Item IDs currently generating or queued
+  private checkedIdbKeys = new Set<string>();
+  private generatingSet = new Set<string>(); // cacheKeys currently generating or queued
   private queue: QueueTask[] = [];
   private isProcessing = false;
   private listeners = new Set<() => void>();
@@ -136,8 +137,8 @@ class ItemArtServiceClass {
     });
   }
 
-  public isGenerating(itemId: string): boolean {
-    return this.generatingSet.has(itemId);
+  public isGenerating(cacheKey: string): boolean {
+    return this.generatingSet.has(cacheKey);
   }
 
   public getItemArt(
@@ -166,19 +167,20 @@ class ItemArtServiceClass {
       };
     }
 
-    // 3. Check IDB asynchronously in background if not already checking
+    // 3. Check IDB asynchronously in background once per cacheKey
     this.checkIDBAsync(cacheKey);
 
     // 4. Default: Procedural SVG fallback
     return {
       artUrl: getItemIllustration(item),
-      isGenerating: this.generatingSet.has(item.id),
+      isGenerating: this.generatingSet.has(cacheKey),
       isGenerated: false,
     };
   }
 
   private async checkIDBAsync(cacheKey: string): Promise<void> {
-    if (this.memoryCache.has(cacheKey)) return;
+    if (this.memoryCache.has(cacheKey) || this.checkedIdbKeys.has(cacheKey)) return;
+    this.checkedIdbKeys.add(cacheKey);
     const cached = await this.idb.get(cacheKey);
     if (cached) {
       this.memoryCache.set(cacheKey, cached);
@@ -195,21 +197,28 @@ class ItemArtServiceClass {
     const prompt = buildItemArtPrompt(item, artStylePrompt);
     const cacheKey = getItemArtCacheKey(worldId, item.id, prompt);
 
-    // If already in memory cache or marked failed, skip
-    if (this.memoryCache.has(cacheKey) || this.failedSet.has(cacheKey)) return;
+    // If already in memory cache, generating/queued, or marked failed, skip
+    if (
+      this.memoryCache.has(cacheKey) ||
+      this.generatingSet.has(cacheKey) ||
+      this.failedSet.has(cacheKey)
+    ) {
+      return;
+    }
+
+    // Reserve immediately to avoid duplicate concurrent IDB + queue scheduling
+    this.generatingSet.add(cacheKey);
+    this.checkedIdbKeys.add(cacheKey);
 
     // Check IDB first
     this.idb.get(cacheKey).then((cached) => {
       if (cached) {
+        this.generatingSet.delete(cacheKey);
         this.memoryCache.set(cacheKey, cached);
         this.notify();
         return;
       }
 
-      // If already generating or queued, skip
-      if (this.generatingSet.has(item.id)) return;
-
-      this.generatingSet.add(item.id);
       this.queue.push({ item, worldId, artStylePrompt, cacheKey });
       this.notify();
       this.processQueue();
@@ -265,7 +274,7 @@ class ItemArtServiceClass {
       // Timeout or network error - mark failed to avoid retry thrashing
       this.failedSet.add(cacheKey);
     } finally {
-      this.generatingSet.delete(item.id);
+      this.generatingSet.delete(cacheKey);
       this.isProcessing = false;
       this.notify();
       // Process next item in queue one by one

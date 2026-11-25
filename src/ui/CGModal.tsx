@@ -18,16 +18,22 @@ export const CGModal: React.FC<CGModalProps> = ({ cg, onClose }) => {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-xl animate-fadeIn">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-xl animate-fadeIn"
+      onClick={onClose}
+    >
       {/* Close button */}
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
+        className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
       >
         <X className="w-6 h-6" />
       </button>
 
-      <div className="relative max-w-4xl w-full rounded-2xl overflow-hidden border border-amber-500/40 shadow-2xl bg-black">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative max-w-4xl w-full rounded-2xl overflow-hidden border border-amber-500/40 shadow-2xl bg-black"
+      >
         <div className="relative aspect-[16/9] w-full overflow-hidden">
           <img
             src={cg.url}

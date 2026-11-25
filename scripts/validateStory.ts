@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { WORLDS } from '../src/worlds';
 import { vaelenStory } from '../src/worlds/vaelen.story';
 import { astralStory } from '../src/worlds/astral.story';
@@ -41,6 +43,7 @@ export interface WorldValidationReport {
   deadEndScenes: string[];
   missingEndingScenes: string[];
   invalidRedirects: string[];
+  missingImages: Array<{ location: string; imagePath: string }>;
 
   // Предупреждения (Жёлтые, код выхода 0)
   unreachableScenes: string[];
@@ -50,6 +53,9 @@ export interface WorldValidationReport {
   endingsWithoutEndingFlag: string[];
   invalidPatches: string[];
   missingCodexFlags: Array<{ entryId: string; title: string; unlockFlag: string }>;
+
+  // Информационные счётчики (не ошибки)
+  readyScenesCount: number;
 }
 
 export function validateWorld(
@@ -67,6 +73,7 @@ export function validateWorld(
     deadEndScenes: [],
     missingEndingScenes: [],
     invalidRedirects: [],
+    missingImages: [],
     unreachableScenes: [],
     ignoredDefeatScenes: [],
     missingFlags: [],
@@ -74,7 +81,15 @@ export function validateWorld(
     endingsWithoutEndingFlag: [],
     invalidPatches: [],
     missingCodexFlags: [],
+    readyScenesCount: 0,
   };
+
+  for (const sId of Object.keys(world.scenes)) {
+    const sceneWebp = path.resolve(process.cwd(), 'public', 'scenes', `${sId}.webp`);
+    if (fs.existsSync(sceneWebp)) {
+      report.readyScenesCount++;
+    }
+  }
 
   const sceneIds = new Set(Object.keys(world.scenes));
 
@@ -354,6 +369,39 @@ export function validateWorld(
     }
   }
 
+  // 7. Проверка существования файлов изображений в public/
+  const checkImageExists = (imagePath: string | undefined, locationDesc: string) => {
+    if (!imagePath) return;
+    if (imagePath.startsWith('data:') || imagePath.startsWith('http://') || imagePath.startsWith('https://')) return;
+    const cleanPath = imagePath.replace(/^\/+/, '');
+    const fullPath = path.resolve(process.cwd(), 'public', cleanPath);
+    if (!fs.existsSync(fullPath)) {
+      report.missingImages.push({
+        location: locationDesc,
+        imagePath,
+      });
+    }
+  };
+
+  checkImageExists(world.coverImage, `Обложка мира (${world.id}.coverImage)`);
+
+  for (const [sId, scene] of Object.entries(world.scenes)) {
+    if (scene.localImage) {
+      checkImageExists(scene.localImage, `Сцена ${sId} (localImage)`);
+    }
+    if (scene.cgIllustration?.url) {
+      checkImageExists(scene.cgIllustration.url, `Сцена ${sId} (cgIllustration.url)`);
+    }
+  }
+
+  if (world.endingsList) {
+    for (const ending of world.endingsList) {
+      if (ending.cgUrl) {
+        checkImageExists(ending.cgUrl, `Концовка ${ending.id} (cgUrl)`);
+      }
+    }
+  }
+
   return report;
 }
 
@@ -366,7 +414,8 @@ function printWorldTable(report: WorldValidationReport): { errorCount: number; w
     report.missingChapterStarts.length +
     report.deadEndScenes.length +
     report.missingEndingScenes.length +
-    report.invalidRedirects.length;
+    report.invalidRedirects.length +
+    report.missingImages.length;
 
   const warningCount =
     report.unreachableScenes.length +
@@ -397,6 +446,7 @@ function printWorldTable(report: WorldValidationReport): { errorCount: number; w
     { label: 'Сцены-тупики (0 выборов, не помечены как концовка)', count: report.deadEndScenes.length, isError: true },
     { label: 'Несуществующие сцены для ID из endingsList', count: report.missingEndingScenes.length, isError: true },
     { label: 'Ошибочные редиректы StoryPack', count: report.invalidRedirects.length, isError: true },
+    { label: 'Отсутствующие файлы изображений в public/', count: report.missingImages.length, isError: true },
     { label: 'Недостижимые сцены (за вычетом концовок поражения)', count: report.unreachableScenes.length, isError: false },
     { label: 'Флаги условий, нигде не выставляемые (flagsSet/хотспоты)', count: report.missingFlags.length, isError: false },
     { label: 'Предметы условий, нигде не выдаваемые (hasItem/инвентарь)', count: report.missingItems.length, isError: false },
@@ -425,6 +475,12 @@ function printWorldTable(report: WorldValidationReport): { errorCount: number; w
   // Отдельный вывод критических ошибок (КРАСНЫЙ)
   if (errorCount > 0) {
     console.log(`\n  ${BOLD}${RED}❌ ОШИБКИ (КРИТИЧЕСКИЕ, код 1) — [${errorCount}]:${RESET}`);
+    if (report.missingImages.length > 0) {
+      console.log(`     ${RED}Отсутствующие файлы изображений в public/:${RESET}`);
+      for (const mi of report.missingImages) {
+        console.log(`       • ${mi.location} -> "${mi.imagePath}" (файл не найден)`);
+      }
+    }
     if (report.deadLinks.length > 0) {
       console.log(`     ${RED}Мёртвые ссылки:${RESET}`);
       for (const d of report.deadLinks) {
@@ -505,6 +561,7 @@ function printWorldTable(report: WorldValidationReport): { errorCount: number; w
   if (report.ignoredDefeatScenes.length > 0) {
     console.log(`  ${DIM}ℹ Концовки поражения (игнорируются по списку): ${report.ignoredDefeatScenes.join(', ')}${RESET}`);
   }
+  console.log(`  ${DIM}ℹ Готовых кадров сцен (public/scenes): ${report.readyScenesCount} из ${report.totalScenes}${RESET}`);
 
   console.log('\n');
   return { errorCount, warningCount };
@@ -527,10 +584,12 @@ export function runValidation(): boolean {
   let totalErrors = 0;
   let totalWarnings = 0;
   let totalScenesChecked = 0;
+  let totalReadyScenes = 0;
 
   for (const item of worldsToTest) {
     const report = validateWorld(item.id, item.world, item.pack, item.base);
     totalScenesChecked += report.totalScenes;
+    totalReadyScenes += report.readyScenesCount;
     const { errorCount, warningCount } = printWorldTable(report);
     totalErrors += errorCount;
     totalWarnings += warningCount;
@@ -540,6 +599,7 @@ export function runValidation(): boolean {
   console.log(`${BOLD}ИТОГОВЫЙ РЕЗУЛЬТАТ ВАЛИДАЦИИ:${RESET}`);
   console.log(`  • Проверено миров: ${BOLD}${worldsToTest.length}${RESET}`);
   console.log(`  • Проверено сцен: ${BOLD}${totalScenesChecked}${RESET}`);
+  console.log(`  • Готовых кадров сцен (public/scenes): ${BOLD}${totalReadyScenes} из ${totalScenesChecked}${RESET} ${DIM}(информационно)${RESET}`);
   console.log(`  • Критических ошибок: ${totalErrors > 0 ? `${BOLD}${RED}${totalErrors}${RESET}` : `${BOLD}${GREEN}0${RESET}`}`);
   console.log(`  • Предупреждений: ${totalWarnings > 0 ? `${BOLD}${YELLOW}${totalWarnings}${RESET}` : `${BOLD}${GREEN}0${RESET}`}`);
   console.log(`${BOLD}================================================================================${RESET}\n`);

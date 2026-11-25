@@ -23,6 +23,12 @@ import { BacklogModal } from './ui/BacklogModal';
 import { EndingsModal } from './ui/EndingsModal';
 import { GalleryModal } from './ui/GalleryModal';
 import { ChapterChronicleModal } from './ui/ChapterChronicleModal';
+import {
+  initSceneArtManifest,
+  getSceneArtUrl,
+  preloadReadySceneArts,
+  subscribeToSceneArtManifest,
+} from './services/sceneArtManifest';
 
 export default function App() {
   const {
@@ -64,42 +70,122 @@ export default function App() {
   const world = getWorld(worldId);
   const currentScene = world.scenes[state.currentSceneId];
 
-  // On mount or world change, trigger background scene art if AI art is enabled
-  useEffect(() => {
-    if (currentScene) {
-      const { aiArtEnabled: isAiEnabled, aiArtQuality } = useGameStore.getState();
-      artQueue.requestSceneArt({
-        world,
-        scene: currentScene,
-        aiArtEnabled: isAiEnabled,
-        quality: aiArtQuality,
-        onSuccess: (url, isStub) => {
-          useGameStore.setState({
-            currentArtUrl: url,
-            isArtLoading: isStub,
-          });
-          if (!isStub && url) {
-            useGameStore.getState().addSceneArtToGallery({
-              id: `${world.id}_${currentScene.id}`,
-              worldId: world.id,
-              sceneId: currentScene.id,
-              sceneTitle: currentScene.chapterTitle || currentScene.location,
-              location: currentScene.location,
-              url,
-            });
-          }
-        },
-        onError: () => {
-          useGameStore.setState({ isArtLoading: false });
-        },
-      });
-      artQueue.preloadNextScenes(world, currentScene, isAiEnabled, aiArtQuality);
-    }
-  }, [worldId]);
-
   // Character sprite emotion layer (B4) - reactive to current page speaker tag or scene default
   const pages = getScenePages(currentScene, state);
   const currentPage = pages[dialogueChunkIndex] || pages[0];
+
+  // 1. Load manifest once on startup and sync current scene art whenever manifest updates
+  useEffect(() => {
+    const syncActiveSceneArt = () => {
+      const store = useGameStore.getState();
+      const activeWorld = getWorld(store.worldId);
+      const activeScene = activeWorld.scenes[store.state.currentSceneId];
+      const artUrl = getSceneArtUrl(activeScene, activeWorld);
+      if (artUrl && artUrl !== store.currentArtUrl) {
+        useGameStore.setState({ currentArtUrl: artUrl });
+      }
+    };
+
+    initSceneArtManifest().then(syncActiveSceneArt);
+    const unsubscribe = subscribeToSceneArtManifest(syncActiveSceneArt);
+    return unsubscribe;
+  }, []);
+
+  // 2. Preload frames of scenes pointed to by choices of the current scene (only ready files)
+  useEffect(() => {
+    if (currentScene?.choices) {
+      const targetIds = currentScene.choices.map((c) => c.targetSceneId).filter(Boolean);
+      preloadReadySceneArts(targetIds);
+    }
+  }, [currentScene?.id]);
+
+  useEffect(() => {
+    const handleGlobalEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+
+      if (inspectedItemDetail) {
+        e.preventDefault();
+        setInspectedItemDetail(null);
+        return;
+      }
+      if (activeSkillCheck) {
+        e.preventDefault();
+        cancelSkillCheck();
+        return;
+      }
+      if (activeCG) {
+        e.preventDefault();
+        setActiveCG(null);
+        return;
+      }
+      if (showCodex) {
+        e.preventDefault();
+        setShowCodex(false);
+        return;
+      }
+      if (showChapterChronicle) {
+        e.preventDefault();
+        setShowChapterChronicle(false);
+        return;
+      }
+      if (showGallery) {
+        e.preventDefault();
+        setShowGallery(false);
+        return;
+      }
+      if (showBacklog) {
+        e.preventDefault();
+        setShowBacklog(false);
+        return;
+      }
+      if (showEndings) {
+        e.preventDefault();
+        setShowEndings(false);
+        return;
+      }
+      if (showHotspots) {
+        e.preventDefault();
+        setShowHotspots(false);
+        return;
+      }
+      if (showWorldSelect) {
+        e.preventDefault();
+        setShowWorldSelect(false);
+        return;
+      }
+      if (activeDrawer && activeDrawer !== 'none') {
+        e.preventDefault();
+        closeDrawer();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalEsc);
+    return () => window.removeEventListener('keydown', handleGlobalEsc);
+  }, [
+    inspectedItemDetail,
+    activeSkillCheck,
+    activeCG,
+    showCodex,
+    showChapterChronicle,
+    showGallery,
+    showBacklog,
+    showEndings,
+    showHotspots,
+    showWorldSelect,
+    activeDrawer,
+    closeDrawer,
+    cancelSkillCheck,
+    setActiveCG,
+    setInspectedItemDetail,
+    setShowCodex,
+    setShowChapterChronicle,
+    setShowGallery,
+    setShowBacklog,
+    setShowEndings,
+    setShowHotspots,
+    setShowWorldSelect,
+  ]);
 
   return (
     <div

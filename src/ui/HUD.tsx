@@ -8,6 +8,7 @@ import {
   Scroll,
   ChevronDown,
   Globe,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
 import { getWorld } from '../worlds';
@@ -22,12 +23,13 @@ interface FlaskProps {
 }
 
 const Flask: React.FC<FlaskProps> = ({ type, value, maxValue, label, delta }) => {
-  const percent = Math.max(0, Math.min(100, (value / maxValue) * 100));
+  const safeMax = maxValue > 0 ? maxValue : 1;
+  const percent = Math.max(0, Math.min(100, (value / safeMax) * 100));
   const isCritical = percent < 25;
 
   return (
     <div
-      className={`pointer-events-auto relative w-[44px] h-[44px] sm:w-[56px] sm:h-[56px] flex-shrink-0 select-none group cursor-help ${
+      className={`pointer-events-auto relative w-[38px] h-[38px] md:w-[56px] md:h-[56px] flex-shrink-0 select-none group cursor-help ${
         type === 'health' && isCritical ? 'animate-flask-heartbeat' : ''
       }`}
       title={`${label}: ${value} из ${maxValue}`}
@@ -252,7 +254,6 @@ export const HUD: React.FC = () => {
     worldId,
     openDrawer,
     activeDrawer,
-    closeDrawer,
     setShowCodex,
     setShowChapterChronicle,
     setShowWorldSelect,
@@ -261,12 +262,21 @@ export const HUD: React.FC = () => {
   const currentScene = world.scenes[state.currentSceneId] || world.scenes[world.startSceneId];
 
   // Delta trackers for value change animations
+  const prevWorldIdRef = useRef(worldId);
   const prevHealthRef = useRef(state.stats.health);
   const prevSanityRef = useRef(state.stats.sanity);
   const [healthDelta, setHealthDelta] = useState<{ value: number; key: number } | null>(null);
   const [sanityDelta, setSanityDelta] = useState<{ value: number; key: number } | null>(null);
 
   useEffect(() => {
+    if (prevWorldIdRef.current !== worldId) {
+      prevWorldIdRef.current = worldId;
+      prevHealthRef.current = state.stats.health;
+      prevSanityRef.current = state.stats.sanity;
+      setHealthDelta(null);
+      setSanityDelta(null);
+      return;
+    }
     const diff = state.stats.health - prevHealthRef.current;
     if (diff !== 0) {
       setHealthDelta((prev) => ({
@@ -275,9 +285,17 @@ export const HUD: React.FC = () => {
       }));
       prevHealthRef.current = state.stats.health;
     }
-  }, [state.stats.health]);
+  }, [worldId, state.stats.health]);
 
   useEffect(() => {
+    if (prevWorldIdRef.current !== worldId) {
+      prevWorldIdRef.current = worldId;
+      prevHealthRef.current = state.stats.health;
+      prevSanityRef.current = state.stats.sanity;
+      setHealthDelta(null);
+      setSanityDelta(null);
+      return;
+    }
     const diff = state.stats.sanity - prevSanityRef.current;
     if (diff !== 0) {
       setSanityDelta((prev) => ({
@@ -286,7 +304,7 @@ export const HUD: React.FC = () => {
       }));
       prevSanityRef.current = state.stats.sanity;
     }
-  }, [state.stats.sanity]);
+  }, [worldId, state.stats.sanity]);
 
   useEffect(() => {
     if (healthDelta) {
@@ -310,75 +328,244 @@ export const HUD: React.FC = () => {
   const unreadCodexCount = unlockedCodexEntries.filter((e) => !readCodexSet.has(e.id)).length;
   const hasChapters = !!(world.chapters && world.chapters.length > 0);
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(target) &&
+        mobileMenuBtnRef.current &&
+        !mobileMenuBtnRef.current.contains(target)
+      ) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [isMobileMenuOpen]);
+
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-24 pointer-events-none select-none bg-gradient-to-b from-[#0B0A0D]/95 via-[#0B0A0D]/60 to-transparent">
-      <div className="max-w-[1800px] mx-auto h-16 sm:h-20 px-3 sm:px-6 pt-2 sm:pt-2.5 grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-6">
-        {/* Left Column: Health and Sanity Circular Flasks */}
-        <div className="flex items-center gap-[10px] justify-start min-w-0">
-          <Flask
-            type="health"
-            value={state.stats.health}
-            maxValue={state.stats.maxHealth}
-            label="Здоровье"
-            delta={healthDelta}
-          />
-          <Flask
-            type="sanity"
-            value={state.stats.sanity}
-            maxValue={state.stats.maxSanity}
-            label="Рассудок"
-            delta={sanityDelta}
-          />
-        </div>
+    <header className="fixed top-0 left-0 right-0 z-30 pointer-events-none select-none bg-gradient-to-b from-[#0B0A0D]/95 via-[#0B0A0D]/70 to-transparent pb-2">
+      <div className="max-w-[1800px] mx-auto px-2 sm:px-6 pt-2">
+        {/* Top Row */}
+        <div className="flex items-center justify-between gap-2 md:grid md:grid-cols-[1fr_auto_1fr] md:gap-6">
+          {/* Left Column: Health and Sanity Circular Flasks */}
+          <div className="flex items-center gap-1.5 md:gap-2.5 justify-start flex-shrink-0">
+            <Flask
+              type="health"
+              value={state.stats.health}
+              maxValue={state.stats.maxHealth}
+              label="Здоровье"
+              delta={healthDelta}
+            />
+            <Flask
+              type="sanity"
+              value={state.stats.sanity}
+              maxValue={state.stats.maxSanity}
+              label="Рассудок"
+              delta={sanityDelta}
+            />
+          </div>
 
-        {/* Center Column: Clean Typography (No frame box or background plate) */}
-        <div className="flex justify-center min-w-0 max-w-[44vw]">
-          <button
-            type="button"
-            onClick={() => {
-              if (hasChapters) {
-                if (activeDrawer !== 'none') closeDrawer();
-                setShowChapterChronicle(true);
+          {/* Center Column (Desktop >=768px only): Clean Typography */}
+          <div className="hidden md:flex justify-center min-w-0 max-w-[44vw]">
+            <button
+              type="button"
+              onClick={() => {
+                if (hasChapters) {
+                  setShowChapterChronicle(true);
+                }
+              }}
+              disabled={!hasChapters}
+              className={`pointer-events-auto max-w-full flex items-center gap-2.5 px-2 py-1 transition-all duration-300 group text-left select-none ${
+                hasChapters
+                  ? 'cursor-pointer hover:drop-shadow-[0_0_12px_rgba(201,165,92,0.65)]'
+                  : 'cursor-default'
+              }`}
+              title={
+                hasChapters
+                  ? 'Открыть хронику глав и оглавление'
+                  : (currentScene?.chapterTitle || world.title)
               }
-            }}
-            disabled={!hasChapters}
-            className={`pointer-events-auto max-w-full flex items-center gap-2 sm:gap-2.5 px-2 py-1 transition-all duration-300 group text-center sm:text-left select-none ${
-              hasChapters
-                ? 'cursor-pointer hover:drop-shadow-[0_0_12px_rgba(201,165,92,0.65)]'
-                : 'cursor-default'
-            }`}
-            title={
-              hasChapters
-                ? 'Открыть хронику глав и оглавление'
-                : (currentScene?.chapterTitle || world.title)
-            }
-          >
-            {/* Chapter title: Forum serif, larger, golden-beige #E8CF8A */}
-            <span className="font-heading text-sm sm:text-base md:text-[17px] tracking-wide text-[#E8CF8A] group-hover:text-[#FFF1C5] transition-colors truncate flex-shrink drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
-              {currentScene?.chapterTitle || world.title}
-            </span>
+            >
+              {/* Chapter title: Forum serif, larger, golden-beige #E8CF8A */}
+              <span className="font-heading text-sm md:text-[17px] tracking-wide text-[#E8CF8A] group-hover:text-[#FFF1C5] transition-colors truncate flex-shrink drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                {currentScene?.chapterTitle || world.title}
+              </span>
 
-            {/* Location subtitle if present: Literata italic, #CDBF9F */}
-            {currentScene?.location && (
-              <>
-                <span className="text-[#8A6B3A]/80 text-[10px] sm:text-xs flex-shrink-0 select-none">
-                  ✦
+              {/* Location subtitle if present: Literata italic, #CDBF9F */}
+              {currentScene?.location && (
+                <>
+                  <span className="text-[#8A6B3A]/80 text-[10px] sm:text-xs flex-shrink-0 select-none">
+                    ✦
+                  </span>
+                  <span className="font-prose italic text-xs sm:text-[13px] text-[#CDBF9F]/85 group-hover:text-[#EFE6CF] transition-colors truncate flex-shrink drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                    {currentScene.location}
+                  </span>
+                </>
+              )}
+
+              {/* Chevron indicates interactive chronicle modal */}
+              {hasChapters && (
+                <ChevronDown className="w-3.5 h-3.5 text-[#8A6B3A] group-hover:text-[#C9A55C] transition-all flex-shrink-0 ml-0.5 group-hover:translate-y-0.5 duration-200" />
+              )}
+            </button>
+          </div>
+
+          {/* Mobile Right Column (<768px): Exactly 4 buttons: Inventory, Quests, Codex, More */}
+          <div className="flex md:hidden items-center gap-1.5 justify-end flex-shrink-0">
+            {/* 1. Inventory */}
+            <button
+              type="button"
+              onClick={() => openDrawer(activeDrawer === 'inventory' ? 'none' : 'inventory')}
+              className={`pointer-events-auto relative w-[36px] h-[36px] rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer ${
+                activeDrawer === 'inventory'
+                  ? 'border-[#C9A55C] bg-[#8A6B3A]/30 text-[#FFF1C5] shadow-[0_0_12px_rgba(201,165,92,0.5)]'
+                  : 'border-[#8A6B3A]/45 bg-[#121016]/80 text-[#BAAC93] hover:text-[#EFE6CF] hover:border-[#C9A55C]'
+              }`}
+              title={`Инвентарь (${state.inventory.length} предметов)`}
+              aria-label="Инвентарь"
+            >
+              <Backpack className="w-4 h-4" />
+              {state.inventory.length > 0 && (
+                <span className="absolute -bottom-1 -right-1 text-[9px] font-tabular-nums font-semibold text-[#121016] bg-[#C9A55C] border border-[#3A2E1D] rounded-full min-w-[15px] h-3.5 px-0.5 flex items-center justify-center shadow-md">
+                  {state.inventory.length}
                 </span>
-                <span className="font-prose italic text-xs sm:text-[13px] text-[#CDBF9F]/85 group-hover:text-[#EFE6CF] transition-colors truncate flex-shrink hidden sm:inline drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                  {currentScene.location}
+              )}
+            </button>
+
+            {/* 2. Quests */}
+            <button
+              type="button"
+              onClick={() => openDrawer(activeDrawer === 'quests' ? 'none' : 'quests')}
+              className={`pointer-events-auto relative w-[36px] h-[36px] rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer ${
+                activeDrawer === 'quests'
+                  ? 'border-[#C9A55C] bg-[#8A6B3A]/30 text-[#FFF1C5] shadow-[0_0_12px_rgba(201,165,92,0.5)]'
+                  : 'border-[#8A6B3A]/45 bg-[#121016]/80 text-[#BAAC93] hover:text-[#EFE6CF] hover:border-[#C9A55C]'
+              }`}
+              title="Задачи летописи"
+              aria-label="Задачи"
+            >
+              <Compass className="w-4 h-4" />
+              {activeQuestsCount > 0 && (
+                <span
+                  className="absolute top-0 right-0 w-2 h-2 rounded-full bg-[#8E2A2A] border border-[#C23B3B] shadow-[0_0_6px_#C23B3B] animate-pulse"
+                  title="Есть активные задачи"
+                />
+              )}
+            </button>
+
+            {/* 3. Codex */}
+            <button
+              type="button"
+              onClick={() => setShowCodex(true)}
+              className="pointer-events-auto relative w-[36px] h-[36px] rounded-full flex items-center justify-center border border-[#8A6B3A]/45 bg-[#121016]/80 text-[#BAAC93] hover:text-[#EFE6CF] hover:border-[#C9A55C] transition-all duration-200 cursor-pointer"
+              title={`Кодекс тайн (${unlockedCodexCount} записей)`}
+              aria-label="Кодекс тайн"
+            >
+              <Scroll className="w-4 h-4" />
+              {unreadCodexCount > 0 ? (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-gradient-to-br from-[#A82424] to-[#5C0D0D] border border-[#E05252] text-white text-[9px] font-tabular-nums font-bold flex items-center justify-center shadow-md animate-pulse">
+                  {unreadCodexCount}
                 </span>
-              </>
-            )}
+              ) : unlockedCodexCount > 0 ? (
+                <span className="absolute -bottom-1 -right-1 text-[9px] font-tabular-nums font-semibold text-[#121016] bg-[#C9A55C] border border-[#3A2E1D] rounded-full min-w-[15px] h-3.5 px-0.5 flex items-center justify-center shadow-md">
+                  {unlockedCodexCount}
+                </span>
+              ) : null}
+            </button>
 
-            {/* Chevron indicates interactive chronicle modal */}
-            {hasChapters && (
-              <ChevronDown className="w-3.5 h-3.5 text-[#8A6B3A] group-hover:text-[#C9A55C] transition-all flex-shrink-0 ml-0.5 group-hover:translate-y-0.5 duration-200" />
-            )}
-          </button>
-        </div>
+            {/* 4. More Menu «⋯» */}
+            <div className="relative">
+              <button
+                ref={mobileMenuBtnRef}
+                type="button"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className={`pointer-events-auto relative w-[36px] h-[36px] rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer ${
+                  isMobileMenuOpen
+                    ? 'border-[#C9A55C] bg-[#8A6B3A]/30 text-[#FFF1C5] shadow-[0_0_12px_rgba(201,165,92,0.5)]'
+                    : 'border-[#8A6B3A]/45 bg-[#121016]/80 text-[#BAAC93] hover:text-[#EFE6CF] hover:border-[#C9A55C]'
+                }`}
+                title="Дополнительное меню"
+                aria-label="Дополнительное меню"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
 
-        {/* Right Column: Interactive Drawer Buttons with Brass Bezel and Tooltips */}
-        <div className="flex items-center gap-1.5 sm:gap-2 justify-end min-w-0">
+              {/* Obsidian & Tarnished Brass Dropdown Menu */}
+              {isMobileMenuOpen && (
+                <div
+                  ref={mobileMenuRef}
+                  className="pointer-events-auto absolute right-0 top-full mt-2 w-48 rounded-lg bg-[#0D0B0E]/95 border border-[#8A6B3A]/80 shadow-[0_12px_36px_rgba(0,0,0,0.95),0_0_18px_rgba(138,107,58,0.25)] p-1.5 backdrop-blur-md z-50 flex flex-col gap-1 text-xs font-heading tracking-wide animate-fadeIn"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      openDrawer(activeDrawer === 'saves' ? 'none' : 'saves');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded text-[#BAAC93] hover:text-[#FFF1C5] hover:bg-[#8A6B3A]/20 transition cursor-pointer"
+                  >
+                    <Save className="w-4 h-4 text-amber-400" />
+                    <span>Сохранения</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowWorldSelect(true);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded text-[#BAAC93] hover:text-[#FFF1C5] hover:bg-[#8A6B3A]/20 transition cursor-pointer"
+                  >
+                    <Globe className="w-4 h-4 text-cyan-400" />
+                    <span>Сменить мир</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      openDrawer(activeDrawer === 'oracle' ? 'none' : 'oracle');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded text-[#BAAC93] hover:text-[#FFF1C5] hover:bg-[#8A6B3A]/20 transition cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    <span>Шёпот Оракула</span>
+                  </button>
+                  <div className="h-px bg-[#8A6B3A]/30 my-0.5" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      openDrawer(activeDrawer === 'settings' ? 'none' : 'settings');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded text-[#BAAC93] hover:text-[#FFF1C5] hover:bg-[#8A6B3A]/20 transition cursor-pointer"
+                  >
+                    <Settings className="w-4 h-4 text-slate-300" />
+                    <span>Настройки</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop Right Column (Desktop >=768px): All buttons */}
+          <div className="hidden md:flex items-center gap-1.5 sm:gap-2 justify-end min-w-0">
           {/* Inventory */}
           <div className="relative group">
             <button
@@ -434,10 +621,7 @@ export const HUD: React.FC = () => {
           <div className="relative group">
             <button
               type="button"
-              onClick={() => {
-                if (activeDrawer !== 'none') closeDrawer();
-                setShowCodex(true);
-              }}
+              onClick={() => setShowCodex(true)}
               className="pointer-events-auto relative w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border border-[#8A6B3A]/45 bg-[#121016]/80 text-[#BAAC93] hover:text-[#EFE6CF] hover:border-[#C9A55C] hover:bg-[#1A1622] hover:shadow-[0_0_12px_rgba(201,165,92,0.35)] transition-all duration-200 cursor-pointer"
               title={`Кодекс тайн (${unlockedCodexCount} записей${unreadCodexCount > 0 ? `, ${unreadCodexCount} непрочитанных` : ''})`}
               aria-label="Кодекс тайн"
@@ -489,10 +673,7 @@ export const HUD: React.FC = () => {
           <div className="relative group">
             <button
               type="button"
-              onClick={() => {
-                if (activeDrawer !== 'none') closeDrawer();
-                setShowWorldSelect(true);
-              }}
+              onClick={() => setShowWorldSelect(true)}
               className="pointer-events-auto relative w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border border-[#8A6B3A]/45 bg-[#121016]/80 text-[#BAAC93] hover:text-[#EFE6CF] hover:border-[#C9A55C] hover:bg-[#1A1622] hover:shadow-[0_0_12px_rgba(201,165,92,0.35)] transition-all duration-200 cursor-pointer"
               title="Сменить мир"
               aria-label="Сменить мир"
@@ -545,6 +726,35 @@ export const HUD: React.FC = () => {
           </div>
         </div>
       </div>
-    </header>
+
+      {/* Mobile Dedicated Second Row: Centered Chapter Title (under flasks, with ellipsis) */}
+      <div className="flex md:hidden justify-center items-center w-full mt-1 px-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (hasChapters) {
+              setShowChapterChronicle(true);
+            }
+          }}
+          disabled={!hasChapters}
+          className={`pointer-events-auto max-w-[95%] flex items-center justify-center gap-1.5 px-2 py-0.5 select-none ${
+            hasChapters ? 'cursor-pointer' : 'cursor-default'
+          }`}
+          title={
+            hasChapters
+              ? 'Открыть хронику глав и оглавление'
+              : (currentScene?.chapterTitle || world.title)
+          }
+        >
+          <span className="font-heading text-xs tracking-wide text-[#E8CF8A] truncate drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+            {currentScene?.chapterTitle || world.title}
+          </span>
+          {hasChapters && (
+            <ChevronDown className="w-3 h-3 text-[#8A6B3A] flex-shrink-0" />
+          )}
+        </button>
+      </div>
+    </div>
+  </header>
   );
 };
